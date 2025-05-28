@@ -21,9 +21,10 @@ ADO Naturale is a Microsoft Edge extension that lets you query Azure DevOps usin
 ## Example Queries Supported
 | Natural Language | Generated URL Pattern |
 |------------------|----------------------|
-| "Show me my bugs" | `.../query/?wiql=SELECT * FROM WorkItems WHERE [System.WorkItemType] = 'Bug' AND [System.AssignedTo] = @Me` |
-| "High priority user stories" | `.../query/?wiql=SELECT * FROM WorkItems WHERE [System.WorkItemType] = 'User Story' AND [Microsoft.VSTS.Common.Priority] <= 2` |
-| "Items created this week" | `.../query/?wiql=SELECT * FROM WorkItems WHERE [System.CreatedDate] >= @Today - 7` |
+| "My bugs" | `.../query/?wiql=SELECT * FROM WorkItems WHERE [System.WorkItemType] = 'Bug' AND [System.AssignedTo] = @Me` |
+| "Everything assigned to me" | `.../query/?wiql=SELECT * FROM WorkItems WHERE [System.AssignedTo] = @Me` |
+| "High priority bugs" | `.../query/?wiql=SELECT * FROM WorkItems WHERE [System.WorkItemType] = 'Bug' AND [Microsoft.VSTS.Common.Priority] <= 2` |
+| "Active bugs assigned to me over a year old" | `.../query/?wiql=SELECT * FROM WorkItems WHERE [System.WorkItemType] = 'Bug' AND [System.AssignedTo] = @Me AND [System.State] = 'Active' AND [System.CreatedDate] <= @Today - 365` |
 
 ## Quick Start
 
@@ -45,6 +46,27 @@ ADO Naturale is a Microsoft Edge extension that lets you query Azure DevOps usin
 
 4. **(Optional) Configure Azure OpenAI**
    - Click the extension icon, enter your OpenAI endpoint and key, and test the connection for smarter query understanding.
+   - See below for how to get your own Azure OpenAI keys.
+
+## How to Get Azure OpenAI Keys and Set Up the Extension
+
+1. **Create an Azure Account**
+   - Go to https://portal.azure.com and sign in or create a new account.
+2. **Create an Azure OpenAI Resource**
+   - In the Azure Portal, search for "Azure OpenAI" and create a new resource.
+   - Follow the prompts to set up your resource and select a region where OpenAI is available.
+3. **Deploy a Model**
+   - In your Azure OpenAI resource, go to the "Deployments" section.
+   - Deploy a model such as `gpt-35-turbo` or `gpt-4`.
+4. **Get Your Endpoint and Key**
+   - In the Azure Portal, go to your OpenAI resource and select "Keys and Endpoint".
+   - Copy the endpoint URL and one of the keys.
+5. **Configure the Extension**
+   - Open the extension popup in your browser.
+   - Paste your endpoint and key into the configuration fields.
+   - Save and test the connection.
+
+**Note:** Access to Azure OpenAI may require approval from Microsoft. If you do not have access, you can request it through the Azure Portal or your organization's Azure administrator.
 
 ## How to Test
 - Try the example queries above.

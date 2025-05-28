@@ -143,9 +143,9 @@
             <div class="suggestions-header">Quick suggestions:</div>
             <div class="suggestions-list">
               <div class="suggestion-item" data-query="Show me my bugs">My bugs</div>
-              <div class="suggestion-item" data-query="Items assigned to me">Assigned to me</div>
-              <div class="suggestion-item" data-query="High priority user stories">High priority stories</div>
-              <div class="suggestion-item" data-query="Work items I created">Created by me</div>
+              <div class="suggestion-item" data-query="Everything assigned to me">Everything assigned to me</div>
+              <div class="suggestion-item" data-query="High priority bugs">High priority bugs</div>
+              <div class="suggestion-item" data-query="Active bugs assigned to me over a year old">Active bugs assigned to me over a year old</div>
             </div>
           </div>
         </div>
@@ -219,9 +219,15 @@
       
       // Suggestion clicks
       const suggestionItems = this.nlInputContainer.querySelectorAll('.suggestion-item');
+      const suggestionQueries = [
+        "My bugs",
+        "Everything assigned to me",
+        "High priority bugs",
+        "Active bugs assigned to me over a year old"
+      ];
       suggestionItems.forEach((item, index) => {
         item.addEventListener('click', () => {
-          const query = item.getAttribute('data-query');
+          const query = suggestionQueries[index] || item.getAttribute('data-query');
           DEBUG.log('EVENTS', 'Suggestion clicked', { index, query });
           this.nlInput.value = query;
           this.handleQuerySubmit();

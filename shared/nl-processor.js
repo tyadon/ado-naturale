@@ -424,14 +424,14 @@
      */
     getExampleQueries() {
       return [
-        'Show me my bugs',
-        'High priority user stories assigned to me',
-        'Tasks created this week',
-        'Resolved bugs from last sprint',
-        'All user stories in current iteration',
-        'Critical issues assigned to @john.doe',
-        'Work items I created this month',
-        'Active tasks with priority 1'
+        "Show me my bugs",
+        "High priority bugs assigned to me",
+        "Tasks created this week",
+        "Resolved bugs from last sprint",
+        "All user stories in current iteration",
+        "Critical issues assigned to @john.doe",
+        "Work items I created this month",
+        "Active tasks with priority 1",
       ];
     }
   }
