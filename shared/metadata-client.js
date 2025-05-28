@@ -11,6 +11,9 @@
    */
   class MetadataClient {
     constructor() {
+      console.log('MetadataClient: Constructor called');
+      console.log('MetadataClient: Current window.location.href:', window.location.href);
+      
       this.baseUrl = this.extractBaseUrl();
       this.organization = this.extractOrganization();
       this.project = this.extractProject();
@@ -23,6 +26,23 @@
         project: this.project,
         currentUrl: window.location.href
       });
+      
+      // Additional validation
+      if (!this.organization || !this.project) {
+        console.error('MetadataClient: Failed to extract organization or project!', {
+          organization: this.organization,
+          project: this.project,
+          url: window.location.href
+        });
+      }
+      
+      if (this.project === 'DefaultCollection') {
+        console.error('MetadataClient: Project extracted as DefaultCollection - this is likely incorrect!', {
+          url: window.location.href,
+          baseUrl: this.baseUrl,
+          organization: this.organization
+        });
+      }
     }
     
     /**
@@ -85,10 +105,26 @@
         return project;
       } else if (url.includes('.visualstudio.com')) {
         // For visualstudio.com: https://organization.visualstudio.com/project/...
-        // Project is the first path segment
-        const match = url.match(/\.visualstudio\.com\/([^\/\?]+)/);
+        // Project is the first path segment after the domain
+        // Handle various URL patterns like /project/_queries, /project, etc.
+        const match = url.match(/\.visualstudio\.com\/([^\/\?\#]+)/);
         const project = match ? match[1] : null;
+        
+        console.log('MetadataClient: URL match result:', match);
         console.log('MetadataClient: Extracted project (visualstudio.com):', project);
+        
+        // If we got DefaultCollection, it might be an old-style URL pattern
+        if (project === 'DefaultCollection') {
+          console.warn('MetadataClient: Detected DefaultCollection - this might be an old URL pattern');
+          // Try to extract the actual project from a different part of the URL
+          const altMatch = url.match(/\.visualstudio\.com\/DefaultCollection\/([^\/\?\#]+)/);
+          if (altMatch) {
+            const altProject = altMatch[1];
+            console.log('MetadataClient: Found alternative project extraction:', altProject);
+            return altProject;
+          }
+        }
+        
         return project;
       }
       return null;
@@ -98,13 +134,25 @@
      * Build API URL based on the hosting environment
      */
     buildApiUrl(endpoint) {
+      console.log('MetadataClient: buildApiUrl called with endpoint:', endpoint);
+      console.log('MetadataClient: buildApiUrl state:', {
+        baseUrl: this.baseUrl,
+        organization: this.organization,
+        project: this.project
+      });
+      
       if (this.baseUrl.includes('dev.azure.com')) {
         // dev.azure.com format: https://dev.azure.com/organization/project/_apis/...
-        return `${this.baseUrl}/${this.organization}/${this.project}/_apis/${endpoint}`;
+        const url = `${this.baseUrl}/${this.organization}/${this.project}/_apis/${endpoint}`;
+        console.log('MetadataClient: buildApiUrl (dev.azure.com) result:', url);
+        return url;
       } else if (this.baseUrl.includes('.visualstudio.com')) {
         // visualstudio.com format: https://organization.visualstudio.com/project/_apis/...
-        return `${this.baseUrl}/${this.project}/_apis/${endpoint}`;
+        const url = `${this.baseUrl}/${this.project}/_apis/${endpoint}`;
+        console.log('MetadataClient: buildApiUrl (visualstudio.com) result:', url);
+        return url;
       }
+      console.error('MetadataClient: buildApiUrl - Unsupported ADO hosting environment');
       throw new Error('Unsupported ADO hosting environment');
     }
     
@@ -112,13 +160,25 @@
      * Build organization-level API URL (no project in path)
      */
     buildOrgApiUrl(endpoint) {
+      console.log('MetadataClient: buildOrgApiUrl called with endpoint:', endpoint);
+      console.log('MetadataClient: buildOrgApiUrl state:', {
+        baseUrl: this.baseUrl,
+        organization: this.organization,
+        project: this.project
+      });
+      
       if (this.baseUrl.includes('dev.azure.com')) {
         // dev.azure.com format: https://dev.azure.com/organization/_apis/...
-        return `${this.baseUrl}/${this.organization}/_apis/${endpoint}`;
+        const url = `${this.baseUrl}/${this.organization}/_apis/${endpoint}`;
+        console.log('MetadataClient: buildOrgApiUrl (dev.azure.com) result:', url);
+        return url;
       } else if (this.baseUrl.includes('.visualstudio.com')) {
         // visualstudio.com format: https://organization.visualstudio.com/_apis/...
-        return `${this.baseUrl}/_apis/${endpoint}`;
+        const url = `${this.baseUrl}/_apis/${endpoint}`;
+        console.log('MetadataClient: buildOrgApiUrl (visualstudio.com) result:', url);
+        return url;
       }
+      console.error('MetadataClient: buildOrgApiUrl - Unsupported ADO hosting environment');
       throw new Error('Unsupported ADO hosting environment');
     }
     

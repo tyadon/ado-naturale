@@ -85,11 +85,23 @@
     } else if (context.url.includes('.visualstudio.com')) {
       // visualstudio.com format: https://organization.visualstudio.com/project/...
       const orgMatch = context.url.match(/https:\/\/(.+?)\.visualstudio\.com/);
-      const projectMatch = context.url.match(/\.visualstudio\.com\/([^\/\?]+)/);
+      const projectMatch = context.url.match(/\.visualstudio\.com\/([^\/\?\#]+)/);
       
       if (orgMatch && projectMatch) {
         context.organization = orgMatch[1];
-        context.project = projectMatch[1];
+        let project = projectMatch[1];
+        
+        // Handle DefaultCollection pattern - extract actual project from next segment
+        if (project === 'DefaultCollection') {
+          console.warn('Content Script: Detected DefaultCollection pattern');
+          const altMatch = context.url.match(/\.visualstudio\.com\/DefaultCollection\/([^\/\?\#]+)/);
+          if (altMatch) {
+            project = altMatch[1];
+            console.log('Content Script: Using alternative project extraction:', project);
+          }
+        }
+        
+        context.project = project;
       }
     }
     

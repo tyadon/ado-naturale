@@ -56,8 +56,20 @@
       } else if (url.includes('.visualstudio.com')) {
         // For visualstudio.com: https://organization.visualstudio.com/project/...
         // Project is the first path segment
-        const match = url.match(/\.visualstudio\.com\/([^\/\?]+)/);
-        return match ? match[1] : null;
+        const match = url.match(/\.visualstudio\.com\/([^\/\?\#]+)/);
+        let project = match ? match[1] : null;
+        
+        // Handle DefaultCollection pattern - extract actual project from next segment
+        if (project === 'DefaultCollection') {
+          console.warn('API Client: Detected DefaultCollection pattern in URL:', url);
+          const altMatch = url.match(/\.visualstudio\.com\/DefaultCollection\/([^\/\?\#]+)/);
+          if (altMatch) {
+            project = altMatch[1];
+            console.log('API Client: Using alternative project extraction:', project);
+          }
+        }
+        
+        return project;
       }
       return null;
     }
