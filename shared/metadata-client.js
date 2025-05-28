@@ -3,6 +3,8 @@
  * Fetches comprehensive field metadata from Azure DevOps to enhance NLP capabilities
  */
 
+// Debug output cleaned for beta release. Only DEBUG utility and explicit debug helpers remain.
+
 (function() {
   'use strict';
   

@@ -32,70 +32,54 @@
      * Generate a query URL from processed natural language
      */
     generateQueryUrl(processedQuery, context = {}) {
-      console.log('Generating query URL from processed query:', processedQuery);
+      // Create WIQL
+      const wiql = this.generateWIQL(processedQuery, context);
       
-      try {
-        // Create WIQL
-        const wiql = this.generateWIQL(processedQuery, context);
-        
-        // Encode WIQL for URL
-        const encodedWiql = encodeURIComponent(wiql);
-        
-        // Build the URL base using current context
-        const baseUrl = this.buildQueryUrl(
-          context.organization, 
-          context.project, 
-          context.url || window.location.href
-        );
-        
-        // Add the encoded WIQL
-        const fullUrl = `${baseUrl}?wiql=${encodedWiql}`;
-        
-        console.log('Generated query URL:', fullUrl);
-        return fullUrl;
-      } catch (error) {
-        console.error('Error generating query URL:', error);
-        throw error;
-      }
+      // Encode WIQL for URL
+      const encodedWiql = encodeURIComponent(wiql);
+      
+      // Build the URL base using current context
+      const baseUrl = this.buildQueryUrl(
+        context.organization, 
+        context.project, 
+        context.url || window.location.href
+      );
+      
+      // Add the encoded WIQL
+      const fullUrl = `${baseUrl}?wiql=${encodedWiql}`;
+      
+      return fullUrl;
     }
     
     /**
      * Generate WIQL query from processed natural language
      */
     generateWIQL(processedQuery, context = {}) {
-      console.log('Generating WIQL for URL from processed query:', processedQuery);
+      // Build SELECT clause
+      const fields = this.determineSelectFields(processedQuery);
+      const selectClause = `SELECT ${fields.join(', ')}`;
       
-      try {
-        // Build SELECT clause
-        const fields = this.determineSelectFields(processedQuery);
-        const selectClause = `SELECT ${fields.join(', ')}`;
-        
-        // Build FROM clause
-        const fromClause = 'FROM WorkItems';
-        
-        // Build WHERE clause
-        const whereClause = this.buildWhereClause(processedQuery, context);
-        
-        // Build ORDER BY clause
-        const orderByClause = this.buildOrderByClause(processedQuery);
-        
-        // Construct full WIQL
-        let wiql = `${selectClause} ${fromClause}`;
-        
-        if (whereClause) {
-          wiql += ` WHERE ${whereClause}`;
-        }
-        
-        if (orderByClause) {
-          wiql += ` ORDER BY ${orderByClause}`;
-        }
-        
-        console.log('Generated WIQL:', wiql);
-        return wiql;
-      } catch (error) {
-        console.error('Error generating WIQL:', error);
-        throw error;
+      // Build FROM clause
+      const fromClause = 'FROM WorkItems';
+      
+      // Build WHERE clause
+      const whereClause = this.buildWhereClause(processedQuery, context);
+      
+      // Build ORDER BY clause
+      const orderByClause = this.buildOrderByClause(processedQuery);
+      
+      // Construct full WIQL
+      let wiql = `${selectClause} ${fromClause}`;
+      
+      if (whereClause) {
+        wiql += ` WHERE ${whereClause}`;
       }
+      
+      if (orderByClause) {
+        wiql += ` ORDER BY ${orderByClause}`;
+      }
+      
+      return wiql;
     }
     
     /**
