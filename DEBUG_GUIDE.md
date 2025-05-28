@@ -3,6 +3,103 @@
 ## Overview
 Comprehensive debug statements have been implemented throughout the entire query execution flow to help you trace what's happening step by step.
 
+## Preserving Logs During Page Navigation
+
+### Problem
+When ADO Naturale executes a query, it navigates to a new page, which clears the browser console logs. This makes it difficult to see what happened during query processing.
+
+### Solutions
+
+#### 1. Enable "Preserve log" in Browser Console (Recommended)
+**Chrome/Edge:**
+1. Open Developer Tools (F12)
+2. Go to Console tab
+3. Click the gear icon (⚙️) or look for "Console settings"
+4. Check "Preserve log" option
+5. This keeps logs even when the page navigates
+
+**Firefox:**
+1. Open Developer Tools (F12)
+2. Go to Console tab
+3. Click the gear icon in the console toolbar
+4. Check "Persist Logs"
+
+#### 2. Use Network Tab for API Calls
+1. Open Developer Tools (F12)
+2. Go to Network tab
+3. Check "Preserve log" option
+4. Execute your query
+5. Look for API calls to Azure OpenAI in the network requests
+6. Click on the request to see headers, request body, and response
+
+#### 3. Copy Logs Before Query Execution
+1. Open console and enable preserve log
+2. Submit your query
+3. Right-click in console → "Save as..." to save all logs
+4. Or select all logs (Ctrl+A) and copy (Ctrl+C)
+
+#### 4. Use Browser's Performance Tab
+1. Open Developer Tools (F12)
+2. Go to Performance tab
+3. Click Record
+4. Execute your query
+5. Stop recording
+6. You can see console messages in the timeline
+
+#### 5. Add Breakpoints to Pause Execution
+You can add breakpoints in the console to pause execution:
+
+```javascript
+// Paste this in console before submitting query
+window.ADONaturale_DEBUG_PAUSE = true;
+
+// This will pause execution before navigation
+// The debug implementation will check for this flag
+```
+
+#### 6. Enable Detailed Console Logging
+Run this in console for even more detailed logging:
+
+```javascript
+// Enable maximum verbosity
+localStorage.setItem('ado-naturale-debug-level', 'verbose');
+
+// You can also enable specific categories
+localStorage.setItem('ado-naturale-debug-categories', 'API_CALL,QUERY_PROCESSING,EXECUTE_QUERY');
+```
+
+### Recommended Workflow
+
+1. **Before testing:**
+   - Enable "Preserve log" in Console tab
+   - Clear console (Ctrl+L)
+   - Open Network tab and enable "Preserve log" there too
+
+2. **During testing:**
+   - Submit your natural language query
+   - Let the page navigate naturally
+
+3. **After navigation:**
+   - Return to console tab to view preserved logs
+   - Check Network tab for API calls
+   - Look for any error messages or warnings
+
+4. **For deeper analysis:**
+   - Save console logs if needed
+   - Check specific debug categories
+   - Review API request/response details in Network tab
+
+### What to Look For
+
+Even with preserved logs, focus on these key log sequences:
+
+1. **Query Start:** `🔍 [UI-Injector][QUERY_SUBMIT] Query submission started`
+2. **Processing Method:** Look for either "AI processing" or "pattern matching"
+3. **API Calls:** `🔍 [OpenAI-Client][API_CALL]` messages if using AI
+4. **Success/Failure:** `✅` for success, `❌` for errors
+5. **URL Generation:** Final query URL that was generated
+6. **Navigation:** `🔍 [UI-Injector][EXECUTE_QUERY] Starting query execution`
+
 ## Debug Categories
 
 ### Content Script Debug Categories

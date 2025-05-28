@@ -348,6 +348,29 @@
         hasQueryExecutor: typeof window.ADONaturale !== 'undefined' && !!window.ADONaturale.QueryExecutor
       });
       
+      // Check for debug pause flag
+      if (window.ADONaturale_DEBUG_PAUSE) {
+        DEBUG.warn('EXECUTE_QUERY', '🛑 DEBUG PAUSE ENABLED - Execution paused for log inspection', {
+          url: queryUrl,
+          instructions: 'Review console logs, then set window.ADONaturale_DEBUG_PAUSE = false to continue'
+        });
+        
+        // Show user-friendly alert
+        const shouldContinue = confirm(
+          `🛑 DEBUG PAUSE ENABLED\n\n` +
+          `Query URL generated: ${queryUrl.substring(0, 100)}...\n\n` +
+          `The execution is paused so you can inspect the console logs.\n` +
+          `Click OK to continue navigation, or Cancel to abort.`
+        );
+        
+        if (!shouldContinue) {
+          DEBUG.log('EXECUTE_QUERY', 'User chose to abort navigation during debug pause');
+          return;
+        }
+        
+        DEBUG.log('EXECUTE_QUERY', 'User chose to continue navigation, proceeding...');
+      }
+      
       try {
         // Use the query executor to navigate to the URL
         if (typeof window.ADONaturale !== 'undefined' && window.ADONaturale.QueryExecutor) {
