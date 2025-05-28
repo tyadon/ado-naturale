@@ -120,28 +120,34 @@
           </button>
         </div>
         <div class="ado-naturale-content">
-          <div class="ado-naturale-input-section">
+          <div class="ado-naturale-input-group">
             <textarea 
               class="ado-naturale-input" 
               placeholder="Enter your query in natural language (e.g., 'Show me my bugs', 'High priority user stories assigned to me')"
               rows="2"
             ></textarea>
-            <button class="ado-naturale-submit">Query</button>
+            <button class="ado-naturale-submit">
+              <span class="submit-icon">🔍</span>
+              <span class="submit-text">Query</span>
+            </button>
           </div>
           <div class="ado-naturale-feedback" style="display: none;">
             <div class="feedback-content"></div>
-          </div>
-          <div class="ado-naturale-suggestions">
-            <div class="suggestion-item" data-query="Show me my bugs">My bugs</div>
-            <div class="suggestion-item" data-query="Items assigned to me">Assigned to me</div>
-            <div class="suggestion-item" data-query="High priority user stories">High priority stories</div>
-            <div class="suggestion-item" data-query="Work items I created">Created by me</div>
           </div>
           <div class="ado-naturale-loading" style="display: none;">
             <div class="loading-spinner"></div>
             <span>Processing query...</span>
           </div>
           <div class="ado-naturale-error" style="display: none;"></div>
+          <div class="ado-naturale-suggestions">
+            <div class="suggestions-header">Quick suggestions:</div>
+            <div class="suggestions-list">
+              <div class="suggestion-item" data-query="Show me my bugs">My bugs</div>
+              <div class="suggestion-item" data-query="Items assigned to me">Assigned to me</div>
+              <div class="suggestion-item" data-query="High priority user stories">High priority stories</div>
+              <div class="suggestion-item" data-query="Work items I created">Created by me</div>
+            </div>
+          </div>
         </div>
       `;
       
