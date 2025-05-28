@@ -6,13 +6,72 @@
 (function() {
   'use strict';
   
+  // Debug utility
+  const DEBUG = {
+    log: (category, message, data = null) => {
+      const timestamp = new Date().toISOString();
+      const prefix = `🔍 [Enhanced-NL-Processor][${category}][${timestamp}]`;
+      if (data) {
+        console.log(prefix, message, data);
+      } else {
+        console.log(prefix, message);
+      }
+    },
+    error: (category, message, error = null) => {
+      const timestamp = new Date().toISOString();
+      const prefix = `❌ [Enhanced-NL-Processor][${category}][${timestamp}]`;
+      if (error) {
+        console.error(prefix, message, error);
+      } else {
+        console.error(prefix, message);
+      }
+    },
+    warn: (category, message, data = null) => {
+      const timestamp = new Date().toISOString();
+      const prefix = `⚠️ [Enhanced-NL-Processor][${category}][${timestamp}]`;
+      if (data) {
+        console.warn(prefix, message, data);
+      } else {
+        console.warn(prefix, message);
+      }
+    }
+  };
+  
+  DEBUG.log('INIT', 'Enhanced NL Processor script loading');
+  
   /**
    * Enhanced Natural Language Processor class
    */
   class EnhancedNLProcessor {
     constructor() {
-      this.metadataClient = new window.ADONaturale_MetadataClient(); // Uses singleton
-      this.openaiClient = new window.ADONaturale_OpenAIClient();
+      DEBUG.log('CONSTRUCTOR', 'Creating new EnhancedNLProcessor instance');
+      
+      this.isInitialized = false;
+      this.metadata = null;
+      this.metadataLoadPromise = null;
+      
+      // Initialize clients
+      DEBUG.log('CONSTRUCTOR', 'Initializing client instances');
+      
+      if (typeof window.ADONaturale_MetadataClient !== 'undefined') {
+        this.metadataClient = new window.ADONaturale_MetadataClient();
+        DEBUG.log('CONSTRUCTOR', '✅ Metadata client initialized');
+      } else {
+        DEBUG.error('CONSTRUCTOR', 'Metadata client not available');
+      }
+      
+      if (typeof window.ADONaturale_OpenAIClient !== 'undefined') {
+        this.openaiClient = new window.ADONaturale_OpenAIClient();
+        DEBUG.log('CONSTRUCTOR', '✅ OpenAI client initialized');
+      } else {
+        DEBUG.error('CONSTRUCTOR', 'OpenAI client not available');
+      }
+      
+      DEBUG.log('CONSTRUCTOR', 'EnhancedNLProcessor instance created', {
+        hasMetadataClient: !!this.metadataClient,
+        hasOpenAIClient: !!this.openaiClient
+      });
+      
       this.fallbackProcessor = null;
       
       // Initialize fallback processor if available
@@ -23,12 +82,6 @@
           console.warn('Enhanced NL Processor: Could not initialize fallback processor:', error);
         }
       }
-      
-      this.metadata = null;
-      this.metadataLoadPromise = null;
-      this.isInitialized = false;
-      
-      console.log('Enhanced NL Processor: Constructor completed, using singleton MetadataClient');
     }
     
     /**
@@ -36,113 +89,124 @@
      */
     async initialize() {
       if (this.isInitialized) {
+        DEBUG.log('INITIALIZE', 'Already initialized, skipping');
         return true;
       }
       
+      DEBUG.log('INITIALIZE', 'Starting initialization process');
+      
       try {
-        console.log('Enhanced NL Processor: Initializing...');
+        const initStartTime = Date.now();
         
         // Load metadata and OpenAI configuration in parallel
+        DEBUG.log('INITIALIZE', 'Loading metadata and OpenAI configuration in parallel');
+        
         const [metadataLoaded, openaiConfigured] = await Promise.all([
           this.loadMetadata(),
-          this.openaiClient.loadConfiguration()
+          this.openaiClient ? this.openaiClient.loadConfiguration() : Promise.resolve(false)
         ]);
+        
+        const initTime = Date.now() - initStartTime;
         
         this.isInitialized = true;
         
-        console.log('Enhanced NL Processor: Initialized', {
+        DEBUG.log('INITIALIZE', '✅ Initialization completed', {
           metadataLoaded,
           openaiConfigured,
           hasMetadata: !!this.metadata,
-          isOpenAIConfigured: this.openaiClient.isConfigured()
+          isOpenAIConfigured: this.openaiClient ? this.openaiClient.isConfigured() : false,
+          initTime: `${initTime}ms`
         });
         
         return true;
       } catch (error) {
-        console.error('Enhanced NL Processor: Initialization failed:', error);
+        DEBUG.error('INITIALIZE', 'Initialization failed', error);
         this.isInitialized = false;
         return false;
       }
     }
     
     /**
-     * Load comprehensive metadata from ADO
+     * Load metadata from the metadata client
      */
     async loadMetadata() {
-      if (this.metadataLoadPromise) {
-        console.log('Enhanced NL Processor: Metadata load already in progress, waiting...');
-        return this.metadataLoadPromise;
-      }
+      DEBUG.log('METADATA_LOAD', 'Starting metadata loading process');
       
-      // Check if we already have valid cached metadata from the singleton
-      if (this.metadata && this.metadata.timestamp) {
-        const ageMs = Date.now() - this.metadata.timestamp;
-        const cacheExpiry = 24 * 60 * 60 * 1000; // 24 hours
-        
-        if (ageMs < cacheExpiry) {
-          const ageHours = Math.round(ageMs / (1000 * 60 * 60) * 100) / 100;
-          console.log(`📂 Enhanced NL Processor: Using existing cached metadata (${ageHours} hours old)`);
-          return true;
-        }
-      }
-      
-      console.log('Enhanced NL Processor: Loading metadata from singleton client...');
-      this.metadataLoadPromise = this.metadataClient.getComprehensiveMetadata();
-      
-      try {
-        this.metadata = await this.metadataLoadPromise;
-        
-        const isCached = this.metadata.timestamp && (Date.now() - this.metadata.timestamp) > 1000;
-        const ageHours = this.metadata.timestamp ? (Date.now() - this.metadata.timestamp) / (1000 * 60 * 60) : 0;
-        
-        console.log('Enhanced NL Processor: Metadata loaded', {
-          organization: this.metadata.organization,
-          project: this.metadata.project,
-          workItemTypesCount: Object.keys(this.metadata.workItemTypes).length,
-          fieldsCount: Object.keys(this.metadata.fields).length,
-          teamMembersCount: this.metadata.teamMembers.length,
-          iterationsCount: this.metadata.iterations.length,
-          isFallback: this.metadata.isFallback,
-          isCached: isCached,
-          ageHours: Math.round(ageHours * 100) / 100,
-          nextRefresh: this.metadata.cacheInfo?.nextRefresh,
-          usingSingleton: true
-        });
-        
-        if (isCached) {
-          console.log(`📂 Enhanced NL Processor: Using cached metadata from singleton (${Math.round(ageHours * 100) / 100} hours old)`);
-        } else {
-          console.log('🆕 Enhanced NL Processor: Using fresh metadata from singleton');
-        }
-        
-        // Clear the promise since we're done
-        this.metadataLoadPromise = null;
-        
-        return true;
-      } catch (error) {
-        console.error('Enhanced NL Processor: Failed to load metadata:', error);
-        this.metadata = null;
-        this.metadataLoadPromise = null;
+      if (!this.metadataClient) {
+        DEBUG.error('METADATA_LOAD', 'Metadata client not available');
         return false;
       }
+      
+      // If metadata is already loading, wait for that promise
+      if (this.metadataLoadPromise) {
+        DEBUG.log('METADATA_LOAD', 'Metadata load already in progress, waiting for completion');
+        return await this.metadataLoadPromise;
+      }
+      
+      // If metadata is already loaded, return true
+      if (this.metadata) {
+        DEBUG.log('METADATA_LOAD', 'Metadata already loaded', {
+          organization: this.metadata.organization,
+          project: this.metadata.project,
+          workItemTypesCount: Object.keys(this.metadata.workItemTypes || {}).length,
+          fieldsCount: Object.keys(this.metadata.fields || {}).length
+        });
+        return true;
+      }
+      
+      // Start loading metadata
+      DEBUG.log('METADATA_LOAD', 'Loading comprehensive metadata from client');
+      
+      this.metadataLoadPromise = (async () => {
+        try {
+          const metadataStartTime = Date.now();
+          this.metadata = await this.metadataClient.getComprehensiveMetadata();
+          const metadataLoadTime = Date.now() - metadataStartTime;
+          
+          DEBUG.log('METADATA_LOAD', '✅ Metadata loaded successfully', {
+            loadTime: `${metadataLoadTime}ms`,
+            organization: this.metadata.organization,
+            project: this.metadata.project,
+            workItemTypesCount: Object.keys(this.metadata.workItemTypes || {}).length,
+            fieldsCount: Object.keys(this.metadata.fields || {}).length,
+            teamMembersCount: (this.metadata.teamMembers || []).length,
+            iterationsCount: (this.metadata.iterations || []).length,
+            areaPathsCount: (this.metadata.areaPaths || []).length
+          });
+          
+          return true;
+        } catch (error) {
+          DEBUG.error('METADATA_LOAD', 'Failed to load metadata', error);
+          this.metadata = null;
+          return false;
+        } finally {
+          this.metadataLoadPromise = null;
+        }
+      })();
+      
+      return await this.metadataLoadPromise;
     }
     
     /**
      * Process natural language query with enhanced capabilities
      */
     async processQuery(userInput, context = {}) {
-      console.log('Enhanced NL Processor: Processing query:', userInput);
-      console.log('Enhanced NL Processor: Context:', context);
+      DEBUG.log('PROCESS_QUERY', 'Starting query processing', {
+        query: userInput,
+        queryLength: userInput?.length || 0,
+        context,
+        isInitialized: this.isInitialized
+      });
       
       // Ensure we're initialized
       if (!this.isInitialized) {
-        console.log('Enhanced NL Processor: Not initialized, initializing now...');
+        DEBUG.log('PROCESS_QUERY', 'Not initialized, initializing now');
         await this.initialize();
       }
       
       // Validate input
       if (!userInput || typeof userInput !== 'string' || userInput.trim().length === 0) {
-        console.warn('Enhanced NL Processor: Empty or invalid query');
+        DEBUG.error('PROCESS_QUERY', 'Empty or invalid query provided');
         return this.createErrorResult('Empty or invalid query');
       }
       
@@ -150,49 +214,75 @@
       
       try {
         // Enhance context with metadata
+        DEBUG.log('PROCESS_QUERY', 'Enhancing context with metadata');
         const enhancedContext = await this.enhanceContext(context);
-        console.log('Enhanced NL Processor: Enhanced context prepared');
+        
+        DEBUG.log('PROCESS_QUERY', 'Enhanced context prepared', {
+          originalContextKeys: Object.keys(context),
+          enhancedContextKeys: Object.keys(enhancedContext),
+          hasMetadata: !!this.metadata
+        });
         
         // Check if AI processing is available and configured
-        const isAIConfigured = this.openaiClient.isConfigured();
+        const isAIConfigured = this.openaiClient ? this.openaiClient.isConfigured() : false;
         const hasMetadata = !!this.metadata;
         
-        console.log('Enhanced NL Processor: AI configured:', isAIConfigured);
-        console.log('Enhanced NL Processor: Has metadata:', hasMetadata);
+        DEBUG.log('PROCESS_QUERY', 'Processing capabilities check', {
+          isAIConfigured,
+          hasMetadata,
+          hasOpenAIClient: !!this.openaiClient,
+          hasMetadataClient: !!this.metadataClient
+        });
         
         // Try AI-powered generation first
         if (isAIConfigured && hasMetadata) {
-          console.log('Enhanced NL Processor: Attempting AI processing...');
+          DEBUG.log('PROCESS_QUERY', 'Attempting AI processing (Azure OpenAI)');
           try {
             const aiResult = await this.processWithAI(userInput, enhancedContext);
             if (aiResult.success) {
-              console.log('Enhanced NL Processor: AI processing successful!');
+              DEBUG.log('PROCESS_QUERY', '✅ AI processing successful!', {
+                method: aiResult.method,
+                confidence: aiResult.confidence,
+                hasUrl: !!aiResult.url
+              });
               aiResult.processingTime = Date.now() - startTime;
               return aiResult;
             } else {
-              console.warn('Enhanced NL Processor: AI processing returned unsuccessful result');
+              DEBUG.warn('PROCESS_QUERY', 'AI processing returned unsuccessful result', aiResult);
             }
           } catch (aiError) {
-            console.warn('Enhanced NL Processor: AI processing failed with error:', aiError);
+            DEBUG.warn('PROCESS_QUERY', 'AI processing failed with error', aiError);
           }
         } else {
           if (!isAIConfigured) {
-            console.log('Enhanced NL Processor: Skipping AI processing - not configured');
+            DEBUG.log('PROCESS_QUERY', 'Skipping AI processing - not configured');
           }
           if (!hasMetadata) {
-            console.log('Enhanced NL Processor: Skipping AI processing - no metadata');
+            DEBUG.log('PROCESS_QUERY', 'Skipping AI processing - no metadata available');
           }
         }
         
         // Fallback to enhanced pattern matching
-        console.log('Enhanced NL Processor: Using enhanced pattern matching fallback');
+        DEBUG.log('PROCESS_QUERY', 'Using enhanced pattern matching fallback');
         const patternResult = await this.processWithEnhancedPatterns(userInput, enhancedContext);
         patternResult.processingTime = Date.now() - startTime;
+        
+        DEBUG.log('PROCESS_QUERY', '✅ Enhanced pattern matching completed', {
+          success: patternResult.success,
+          method: patternResult.method,
+          confidence: patternResult.confidence
+        });
+        
         return patternResult;
         
       } catch (error) {
-        console.error('Enhanced NL Processor: Query processing failed:', error);
-        return this.createErrorResult(error.message, Date.now() - startTime);
+        const processingTime = Date.now() - startTime;
+        DEBUG.error('PROCESS_QUERY', 'Query processing failed', {
+          error,
+          processingTime,
+          query: userInput
+        });
+        return this.createErrorResult(error.message, processingTime);
       }
     }
     
@@ -234,22 +324,33 @@
      * Process query using AI
      */
     async processWithAI(userInput, context) {
+      DEBUG.log('AI_PROCESSING', 'Starting AI processing', {
+        query: userInput,
+        hasOpenAIClient: !!this.openaiClient,
+        isConfigured: this.openaiClient ? this.openaiClient.isConfigured() : false,
+        hasMetadata: !!this.metadata
+      });
+      
       try {
-        console.log('Enhanced NL Processor: Starting AI processing for query:', userInput);
-        console.log('Enhanced NL Processor: AI client configured:', this.openaiClient.isConfigured());
-        console.log('Enhanced NL Processor: Metadata available:', !!this.metadata);
+        if (!this.openaiClient) {
+          DEBUG.error('AI_PROCESSING', 'OpenAI client not available');
+          throw new Error('OpenAI client not available');
+        }
+        
+        DEBUG.log('AI_PROCESSING', 'OpenAI client available, generating query URL');
         
         const result = await this.openaiClient.generateQueryUrl(userInput, this.metadata, context);
         
-        console.log('Enhanced NL Processor: AI client returned result:', {
+        DEBUG.log('AI_PROCESSING', 'OpenAI client returned result', {
           success: result.success,
           method: result.method,
           confidence: result.confidence,
-          hasUrl: !!result.url
+          hasUrl: !!result.url,
+          reasoning: result.reasoning?.substring(0, 100) + (result.reasoning?.length > 100 ? '...' : '')
         });
         
         if (result.success) {
-          console.log('Enhanced NL Processor: AI processing completed successfully');
+          DEBUG.log('AI_PROCESSING', '✅ AI processing completed successfully');
           return {
             success: true,
             url: result.url,
@@ -265,11 +366,14 @@
           };
         }
         
-        console.warn('Enhanced NL Processor: AI processing returned unsuccessful result');
+        DEBUG.warn('AI_PROCESSING', 'AI processing returned unsuccessful result');
         throw new Error('AI processing failed');
         
       } catch (error) {
-        console.error('Enhanced NL Processor: AI processing failed with error:', error);
+        DEBUG.error('AI_PROCESSING', 'AI processing failed with error', {
+          error: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n')
+        });
         throw error;
       }
     }

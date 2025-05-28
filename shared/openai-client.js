@@ -6,11 +6,46 @@
 (function() {
   'use strict';
   
+  // Debug utility
+  const DEBUG = {
+    log: (category, message, data = null) => {
+      const timestamp = new Date().toISOString();
+      const prefix = `🔍 [OpenAI-Client][${category}][${timestamp}]`;
+      if (data) {
+        console.log(prefix, message, data);
+      } else {
+        console.log(prefix, message);
+      }
+    },
+    error: (category, message, error = null) => {
+      const timestamp = new Date().toISOString();
+      const prefix = `❌ [OpenAI-Client][${category}][${timestamp}]`;
+      if (error) {
+        console.error(prefix, message, error);
+      } else {
+        console.error(prefix, message);
+      }
+    },
+    warn: (category, message, data = null) => {
+      const timestamp = new Date().toISOString();
+      const prefix = `⚠️ [OpenAI-Client][${category}][${timestamp}]`;
+      if (data) {
+        console.warn(prefix, message, data);
+      } else {
+        console.warn(prefix, message);
+      }
+    }
+  };
+  
+  DEBUG.log('INIT', 'OpenAI Client script loading');
+  
   /**
    * Azure OpenAI Client class
    */
   class OpenAIClient {
     constructor() {
+      DEBUG.log('CONSTRUCTOR', 'Creating new OpenAI Client instance');
+      
       // These would typically come from environment variables or configuration
       // For now, we'll use placeholder values that need to be configured
       this.endpoint = null; // Will be set via configuration
@@ -19,54 +54,137 @@
       this.apiVersion = '2024-02-15-preview';
       this.maxTokens = 1000;
       this.temperature = 0.1; // Low temperature for consistent, precise responses
+      
+      DEBUG.log('CONSTRUCTOR', 'OpenAI Client initialized with defaults', {
+        deploymentName: this.deploymentName,
+        apiVersion: this.apiVersion,
+        maxTokens: this.maxTokens,
+        temperature: this.temperature,
+        hasEndpoint: !!this.endpoint,
+        hasApiKey: !!this.apiKey
+      });
     }
     
     /**
-     * Configure the OpenAI client with credentials
+     * Load configuration from storage
+     */
+    async loadConfiguration() {
+      DEBUG.log('CONFIG_LOAD', 'Loading OpenAI configuration from storage');
+      
+      try {
+        const result = await chrome.storage.sync.get(['openaiConfig']);
+        
+        DEBUG.log('CONFIG_LOAD', 'Retrieved storage data', {
+          hasOpenaiConfig: !!result.openaiConfig,
+          configKeys: result.openaiConfig ? Object.keys(result.openaiConfig) : []
+        });
+        
+        if (result.openaiConfig) {
+          this.endpoint = result.openaiConfig.endpoint;
+          this.apiKey = result.openaiConfig.apiKey;
+          this.deploymentName = result.openaiConfig.deploymentName || 'gpt-4';
+          
+          DEBUG.log('CONFIG_LOAD', '✅ Configuration loaded successfully', {
+            hasEndpoint: !!this.endpoint,
+            hasApiKey: !!this.apiKey,
+            deploymentName: this.deploymentName,
+            endpointPreview: this.endpoint ? this.endpoint.substring(0, 30) + '...' : null
+          });
+          
+          return true;
+        } else {
+          DEBUG.warn('CONFIG_LOAD', 'No OpenAI configuration found in storage');
+          return false;
+        }
+      } catch (error) {
+        DEBUG.error('CONFIG_LOAD', 'Error loading configuration from storage', error);
+        return false;
+      }
+    }
+    
+    /**
+     * Configure the client with provided settings
      */
     configure(config) {
+      DEBUG.log('CONFIG_SET', 'Configuring OpenAI client', {
+        hasEndpoint: !!config.endpoint,
+        hasApiKey: !!config.apiKey,
+        deploymentName: config.deploymentName,
+        endpointPreview: config.endpoint ? config.endpoint.substring(0, 30) + '...' : null
+      });
+      
       this.endpoint = config.endpoint;
       this.apiKey = config.apiKey;
-      this.deploymentName = config.deploymentName || this.deploymentName;
-      this.apiVersion = config.apiVersion || this.apiVersion;
+      this.deploymentName = config.deploymentName || 'gpt-4';
+      
+      DEBUG.log('CONFIG_SET', '✅ Configuration applied', {
+        isConfigured: this.isConfigured()
+      });
     }
     
     /**
      * Check if the client is properly configured
      */
     isConfigured() {
-      return !!(this.endpoint && this.apiKey);
+      const configured = !!(this.endpoint && this.apiKey && this.deploymentName);
+      
+      DEBUG.log('CONFIG_CHECK', 'Checking configuration status', {
+        hasEndpoint: !!this.endpoint,
+        hasApiKey: !!this.apiKey,
+        hasDeploymentName: !!this.deploymentName,
+        isConfigured: configured
+      });
+      
+      return configured;
     }
     
     /**
      * Generate ADO query URL from natural language using Azure OpenAI
      */
     async generateQueryUrl(userInput, metadata, context = {}) {
-      console.log('OpenAI Client: Starting query generation for:', userInput);
-      console.log('OpenAI Client: Configuration check - configured:', this.isConfigured());
+      DEBUG.log('GENERATE_URL', 'Starting query URL generation', {
+        userInput,
+        hasMetadata: !!metadata,
+        contextKeys: Object.keys(context),
+        isConfigured: this.isConfigured()
+      });
       
       if (!this.isConfigured()) {
-        console.warn('OpenAI Client: Not configured, falling back to pattern matching');
+        DEBUG.error('GENERATE_URL', 'Client not configured, falling back to pattern matching');
         return this.fallbackToPatternMatching(userInput, metadata, context);
       }
       
       try {
-        console.log('OpenAI Client: Building prompt...');
+        const startTime = Date.now();
+        
+        DEBUG.log('GENERATE_URL', 'Building prompt for OpenAI API');
         const prompt = this.buildPrompt(userInput, metadata, context);
-        console.log('OpenAI Client: Prompt built, calling OpenAI API...');
+        
+        DEBUG.log('GENERATE_URL', 'Prompt built successfully, making API call', {
+          promptKeys: Object.keys(prompt),
+          systemPromptLength: prompt.system?.length || 0,
+          userPromptLength: prompt.user?.length || 0
+        });
         
         const response = await this.callOpenAI(prompt);
-        console.log('OpenAI Client: Received response from OpenAI:', {
+        const apiCallTime = Date.now() - startTime;
+        
+        DEBUG.log('GENERATE_URL', 'Received response from OpenAI API', {
           hasResponse: !!response,
-          responseType: typeof response
+          responseType: typeof response,
+          apiCallTime: `${apiCallTime}ms`
         });
         
         // Extract and validate the URL from the response
         const queryUrl = this.extractQueryUrl(response);
-        console.log('OpenAI Client: Extracted URL:', queryUrl ? 'URL found' : 'No URL found');
+        
+        DEBUG.log('GENERATE_URL', 'URL extraction attempted', {
+          hasUrl: !!queryUrl,
+          urlLength: queryUrl?.length || 0
+        });
         
         if (this.validateQueryUrl(queryUrl, context)) {
-          console.log('OpenAI Client: URL validation successful');
+          DEBUG.log('GENERATE_URL', '✅ URL validation successful');
           return {
             success: true,
             url: queryUrl,
@@ -75,13 +193,17 @@
             reasoning: response.reasoning || 'Generated by Azure OpenAI'
           };
         } else {
-          console.warn('OpenAI Client: URL validation failed');
+          DEBUG.error('GENERATE_URL', 'URL validation failed');
           throw new Error('Generated URL failed validation');
         }
         
       } catch (error) {
-        console.error('OpenAI Client: Error during query generation:', error);
-        console.log('OpenAI Client: Falling back to pattern matching');
+        DEBUG.error('GENERATE_URL', 'Error during query generation', {
+          error: error.message,
+          stack: error.stack?.split('\n').slice(0, 3).join('\n')
+        });
+        
+        DEBUG.log('GENERATE_URL', 'Falling back to pattern matching');
         return this.fallbackToPatternMatching(userInput, metadata, context);
       }
     }
@@ -246,8 +368,12 @@ URL: ${baseUrl}/_queries/query/?wiql=SELECT%20%5BSystem.Id%5D%2C%20%5BSystem.Tit
     async callOpenAI(prompt) {
       const url = `${this.endpoint}/openai/deployments/${this.deploymentName}/chat/completions?api-version=${this.apiVersion}`;
       
-      console.log('OpenAI Client: Making API call to:', url);
-      console.log('OpenAI Client: Using deployment:', this.deploymentName);
+      DEBUG.log('API_CALL', 'Preparing Azure OpenAI API call', {
+        endpoint: this.endpoint,
+        deploymentName: this.deploymentName,
+        apiVersion: this.apiVersion,
+        fullUrl: url
+      });
       
       const messages = [
         { role: 'system', content: prompt.system },
@@ -261,60 +387,124 @@ URL: ${baseUrl}/_queries/query/?wiql=SELECT%20%5BSystem.Id%5D%2C%20%5BSystem.Tit
         response_format: { type: 'json_object' }
       };
       
-      console.log('OpenAI Client: Request body prepared, making fetch request...');
-      
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'api-key': this.apiKey
-        },
-        body: JSON.stringify(requestBody)
+      DEBUG.log('API_CALL', 'Request prepared', {
+        messagesCount: messages.length,
+        systemContentLength: messages[0].content.length,
+        userContentLength: messages[1].content.length,
+        maxTokens: this.maxTokens,
+        temperature: this.temperature,
+        requestBodySize: JSON.stringify(requestBody).length
       });
-      
-      console.log('OpenAI Client: Received HTTP response:', {
-        status: response.status,
-        statusText: response.statusText,
-        ok: response.ok
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('OpenAI Client: API error response:', errorText);
-        throw new Error(`Azure OpenAI API error: ${response.status} ${response.statusText} - ${errorText}`);
-      }
-      
-      const data = await response.json();
-      console.log('OpenAI Client: Parsed JSON response:', {
-        hasChoices: !!(data.choices && data.choices.length > 0),
-        choicesCount: data.choices ? data.choices.length : 0
-      });
-      
-      if (!data.choices || data.choices.length === 0) {
-        console.error('OpenAI Client: No choices in response');
-        throw new Error('No response from Azure OpenAI');
-      }
-      
-      const content = data.choices[0].message.content;
-      console.log('OpenAI Client: Extracted content from response, length:', content ? content.length : 0);
       
       try {
-        const parsedContent = JSON.parse(content);
-        console.log('OpenAI Client: Successfully parsed JSON response');
-        return parsedContent;
-      } catch (error) {
-        console.warn('OpenAI Client: Failed to parse JSON, trying URL extraction');
-        // If JSON parsing fails, try to extract URL from text
-        const urlMatch = content.match(/https?:\/\/[^\s]+/);
-        if (urlMatch) {
-          console.log('OpenAI Client: Extracted URL from text response');
-          return {
-            url: urlMatch[0],
-            reasoning: 'Extracted URL from text response'
-          };
+        const fetchStartTime = Date.now();
+        
+        DEBUG.log('API_CALL', 'Making fetch request to Azure OpenAI');
+        
+        const response = await fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'api-key': this.apiKey
+          },
+          body: JSON.stringify(requestBody)
+        });
+        
+        const fetchTime = Date.now() - fetchStartTime;
+        
+        DEBUG.log('API_CALL', 'Received HTTP response', {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          fetchTime: `${fetchTime}ms`,
+          headers: {
+            contentType: response.headers.get('content-type'),
+            contentLength: response.headers.get('content-length')
+          }
+        });
+        
+        if (!response.ok) {
+          const errorText = await response.text();
+          DEBUG.error('API_CALL', 'API returned error response', {
+            status: response.status,
+            statusText: response.statusText,
+            errorText: errorText.substring(0, 500) + (errorText.length > 500 ? '...' : ''),
+            errorTextLength: errorText.length
+          });
+          throw new Error(`Azure OpenAI API error: ${response.status} ${response.statusText} - ${errorText}`);
         }
-        console.error('OpenAI Client: Could not parse response or extract URL');
-        throw new Error('Could not parse OpenAI response');
+        
+        const parseStartTime = Date.now();
+        const data = await response.json();
+        const parseTime = Date.now() - parseStartTime;
+        
+        DEBUG.log('API_CALL', 'Response parsed successfully', {
+          parseTime: `${parseTime}ms`,
+          hasChoices: !!(data.choices && data.choices.length > 0),
+          choicesCount: data.choices ? data.choices.length : 0,
+          hasUsage: !!data.usage,
+          usage: data.usage || null
+        });
+        
+        if (!data.choices || data.choices.length === 0) {
+          DEBUG.error('API_CALL', 'No choices in response', {
+            responseData: data
+          });
+          throw new Error('No response from Azure OpenAI');
+        }
+        
+        const content = data.choices[0].message.content;
+        
+        DEBUG.log('API_CALL', 'Extracted content from response', {
+          contentLength: content ? content.length : 0,
+          contentPreview: content ? content.substring(0, 100) + (content.length > 100 ? '...' : '') : null
+        });
+        
+        try {
+          const parsedContent = JSON.parse(content);
+          DEBUG.log('API_CALL', '✅ Successfully parsed JSON response', {
+            parsedKeys: Object.keys(parsedContent),
+            hasUrl: !!parsedContent.url,
+            hasReasoning: !!parsedContent.reasoning
+          });
+          return parsedContent;
+        } catch (parseError) {
+          DEBUG.warn('API_CALL', 'Failed to parse JSON, attempting URL extraction', {
+            parseError: parseError.message,
+            contentSample: content.substring(0, 200)
+          });
+          
+          // If JSON parsing fails, try to extract URL from text
+          const urlMatch = content.match(/https?:\/\/[^\s]+/);
+          if (urlMatch) {
+            DEBUG.log('API_CALL', '✅ Extracted URL from text response', {
+              extractedUrl: urlMatch[0]
+            });
+            return {
+              url: urlMatch[0],
+              reasoning: 'Extracted URL from text response'
+            };
+          }
+          
+          DEBUG.error('API_CALL', 'Could not parse response or extract URL', {
+            content: content.substring(0, 500)
+          });
+          throw new Error('Could not parse OpenAI response');
+        }
+        
+      } catch (error) {
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+          DEBUG.error('API_CALL', 'Network error during API call', {
+            error: error.message,
+            endpoint: this.endpoint
+          });
+        } else {
+          DEBUG.error('API_CALL', 'Error during API call', {
+            error: error.message,
+            errorType: error.constructor.name
+          });
+        }
+        throw error;
       }
     }
     
@@ -370,20 +560,81 @@ URL: ${baseUrl}/_queries/query/?wiql=SELECT%20%5BSystem.Id%5D%2C%20%5BSystem.Tit
     }
     
     /**
+     * Test the connection to Azure OpenAI
+     */
+    async testConnection() {
+      DEBUG.log('TEST_CONNECTION', 'Starting connection test', {
+        isConfigured: this.isConfigured(),
+        endpoint: this.endpoint?.substring(0, 30) + '...'
+      });
+      
+      if (!this.isConfigured()) {
+        DEBUG.error('TEST_CONNECTION', 'Cannot test connection - not configured');
+        return {
+          success: false,
+          error: 'OpenAI client is not configured'
+        };
+      }
+      
+      try {
+        // Simple test prompt
+        const testPrompt = {
+          system: 'You are a helpful assistant. Respond with a simple JSON object containing a "status" field with value "ok".',
+          user: 'Test connection'
+        };
+        
+        DEBUG.log('TEST_CONNECTION', 'Making test API call');
+        const response = await this.callOpenAI(testPrompt);
+        
+        DEBUG.log('TEST_CONNECTION', '✅ Connection test successful', {
+          hasResponse: !!response,
+          responseType: typeof response
+        });
+        
+        return {
+          success: true,
+          response: response
+        };
+        
+      } catch (error) {
+        DEBUG.error('TEST_CONNECTION', 'Connection test failed', {
+          error: error.message
+        });
+        
+        return {
+          success: false,
+          error: error.message
+        };
+      }
+    }
+    
+    /**
      * Fallback to pattern matching when OpenAI is not available
      */
     async fallbackToPatternMatching(userInput, metadata, context) {
-      console.log('Using pattern matching fallback for query:', userInput);
+      DEBUG.log('FALLBACK', 'Using pattern matching fallback', {
+        userInput,
+        hasMetadata: !!metadata,
+        hasNLProcessor: typeof window.ADONaturale_NLProcessor !== 'undefined',
+        hasURLGenerator: typeof window.ADONaturale_URLGenerator !== 'undefined'
+      });
       
       // Use the existing natural language processor as fallback
       if (window.ADONaturale_NLProcessor) {
+        DEBUG.log('FALLBACK', 'Using existing NL Processor');
         const processor = new window.ADONaturale_NLProcessor();
         const processedQuery = processor.processQuery(userInput, context);
         
         // Use the existing URL generator
         if (window.ADONaturale_URLGenerator) {
+          DEBUG.log('FALLBACK', 'Using existing URL Generator');
           const urlGenerator = new window.ADONaturale_URLGenerator();
           const url = urlGenerator.generateQueryURL(processedQuery, context);
+          
+          DEBUG.log('FALLBACK', '✅ Pattern matching fallback successful', {
+            confidence: processedQuery.confidence || 0.7,
+            hasUrl: !!url
+          });
           
           return {
             success: true,
@@ -396,6 +647,8 @@ URL: ${baseUrl}/_queries/query/?wiql=SELECT%20%5BSystem.Id%5D%2C%20%5BSystem.Tit
       }
       
       // Ultimate fallback - basic URL construction
+      DEBUG.log('FALLBACK', 'Using ultimate fallback - basic URL construction');
+      
       const baseUrl = context.organization && context.project
         ? (context.url?.includes('dev.azure.com')
           ? `https://dev.azure.com/${context.organization}/${context.project}`
@@ -405,76 +658,30 @@ URL: ${baseUrl}/_queries/query/?wiql=SELECT%20%5BSystem.Id%5D%2C%20%5BSystem.Tit
       const basicWiql = `SELECT [System.Id], [System.Title], [System.WorkItemType], [System.State] FROM WorkItems WHERE [System.Title] CONTAINS '${userInput.replace(/'/g, "''")}'`;
       const encodedWiql = encodeURIComponent(basicWiql);
       
+      const fallbackUrl = `${baseUrl}/_queries/query/?wiql=${encodedWiql}`;
+      
+      DEBUG.log('FALLBACK', '✅ Basic fallback URL generated', {
+        baseUrl,
+        wiqlLength: basicWiql.length,
+        encodedWiqlLength: encodedWiql.length
+      });
+      
       return {
         success: true,
-        url: `${baseUrl}/_queries/query/?wiql=${encodedWiql}`,
+        url: fallbackUrl,
         confidence: 0.3,
         method: 'basic-fallback',
         reasoning: 'Basic text search fallback'
       };
     }
-    
-    /**
-     * Get configuration from storage or environment
-     */
-    async loadConfiguration() {
-      try {
-        // Try to get configuration from extension storage
-        const config = await new Promise((resolve) => {
-          chrome.runtime.sendMessage(
-            { action: 'getOpenAIConfig' },
-            (response) => {
-              if (chrome.runtime.lastError) {
-                resolve(null);
-              } else {
-                resolve(response);
-              }
-            }
-          );
-        });
-        
-        if (config) {
-          this.configure(config);
-          return true;
-        }
-        
-        return false;
-      } catch (error) {
-        console.warn('Could not load OpenAI configuration:', error);
-        return false;
-      }
-    }
-    
-    /**
-     * Test the OpenAI connection
-     */
-    async testConnection() {
-      if (!this.isConfigured()) {
-        return { success: false, error: 'Not configured' };
-      }
-      
-      try {
-        const testPrompt = {
-          system: 'You are a test assistant. Respond with a simple JSON object.',
-          user: 'Return {"test": "success", "message": "Connection working"}'
-        };
-        
-        const response = await this.callOpenAI(testPrompt);
-        
-        return {
-          success: true,
-          response: response
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error.message
-        };
-      }
-    }
   }
   
-  // Make the class globally available
-  window.ADONaturale_OpenAIClient = OpenAIClient;
-  
+  // Export the OpenAI client globally
+  if (typeof window.ADONaturale_OpenAIClient === 'undefined') {
+    DEBUG.log('EXPORT', 'Creating global OpenAI Client instance');
+    window.ADONaturale_OpenAIClient = OpenAIClient;
+  } else {
+    DEBUG.warn('EXPORT', 'OpenAI Client already exists in global scope');
+  }
+
 })(); 
