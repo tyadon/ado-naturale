@@ -18,13 +18,14 @@
       this.organization = this.extractOrganization();
       this.project = this.extractProject();
       this.cache = new Map();
-      this.cacheExpiry = 30 * 60 * 1000; // 30 minutes
+      this.cacheExpiry = 24 * 60 * 60 * 1000; // 24 hours (daily cache)
       
       console.log('MetadataClient: Initialized with:', {
         baseUrl: this.baseUrl,
         organization: this.organization,
         project: this.project,
-        currentUrl: window.location.href
+        currentUrl: window.location.href,
+        cacheExpiryHours: 24
       });
       
       // Additional validation
@@ -502,7 +503,11 @@
           teamMembers,
           commonFields: this.getCommonFieldMappings(),
           queryOperators: this.getQueryOperators(),
-          timestamp: Date.now()
+          timestamp: Date.now(),
+          cacheInfo: {
+            cacheExpiry: this.cacheExpiry,
+            nextRefresh: new Date(Date.now() + this.cacheExpiry).toISOString()
+          }
         };
         
         console.log('MetadataClient: Successfully fetched metadata:', {
@@ -512,6 +517,44 @@
           areasCount: areas.length,
           teamMembersCount: teamMembers.length
         });
+        
+        // 🔍 COMPREHENSIVE DEBUG OUTPUT FOR ANALYSIS
+        console.group('🔍 ADO NATURALE - COMPLETE METADATA DEBUG');
+        console.log('📊 METADATA SUMMARY:');
+        console.table({
+          'Organization': metadata.organization,
+          'Project': metadata.project,
+          'Work Item Types': Object.keys(workItemTypes).length,
+          'Fields': Object.keys(enhancedFields).length,
+          'Iterations': iterations.length,
+          'Areas': areas.length,
+          'Team Members': teamMembers.length,
+          'Cache Expiry': '24 hours',
+          'Next Refresh': metadata.cacheInfo.nextRefresh
+        });
+        
+        console.log('📋 FULL METADATA JSON (copy this for analysis):');
+        console.log(JSON.stringify(metadata, null, 2));
+        
+        console.log('💾 To save metadata to file, run this in console:');
+        console.log(`
+const metadata = ${JSON.stringify(metadata, null, 2)};
+const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
+const url = URL.createObjectURL(blob);
+const a = document.createElement('a');
+a.href = url;
+a.download = 'ado-naturale-metadata-${metadata.organization}-${metadata.project}-${new Date().toISOString().split('T')[0]}.json';
+a.click();
+URL.revokeObjectURL(url);
+        `);
+        
+        // Make metadata available globally for debugging
+        if (typeof window !== 'undefined') {
+          window.ADONaturale_DebugMetadata = metadata;
+          console.log('🌐 Metadata also available globally as: window.ADONaturale_DebugMetadata');
+        }
+        
+        console.groupEnd();
         
         return metadata;
       } catch (error) {
@@ -633,12 +676,168 @@
         commonFields: this.getCommonFieldMappings(),
         queryOperators: this.getQueryOperators(),
         timestamp: Date.now(),
-        isFallback: true
+        isFallback: true,
+        cacheInfo: {
+          cacheExpiry: this.cacheExpiry,
+          nextRefresh: new Date(Date.now() + this.cacheExpiry).toISOString()
+        }
       };
+    }
+    
+    /**
+     * 🔧 DEBUG HELPERS - Manual cache management and debugging
+     */
+    
+    /**
+     * Force refresh metadata (ignores cache)
+     */
+    async forceRefreshMetadata() {
+      console.log('🔄 MetadataClient: Force refreshing metadata...');
+      this.cache.clear();
+      const metadata = await this.getComprehensiveMetadata();
+      console.log('✅ MetadataClient: Force refresh completed');
+      return metadata;
+    }
+    
+    /**
+     * Get cache status and information
+     */
+    getCacheStatus() {
+      const cacheKeys = Array.from(this.cache.keys());
+      const cacheStatus = {};
+      
+      cacheKeys.forEach(key => {
+        const cached = this.cache.get(key);
+        const age = Date.now() - cached.timestamp;
+        const isExpired = age > this.cacheExpiry;
+        
+        cacheStatus[key] = {
+          ageMs: age,
+          ageHours: Math.round(age / (1000 * 60 * 60) * 100) / 100,
+          isExpired,
+          size: JSON.stringify(cached.data).length,
+          timestamp: new Date(cached.timestamp).toISOString()
+        };
+      });
+      
+      const status = {
+        cacheExpiryHours: this.cacheExpiry / (1000 * 60 * 60),
+        totalCacheEntries: cacheKeys.length,
+        cacheEntries: cacheStatus,
+        nextRefreshAfter: new Date(Date.now() + this.cacheExpiry).toISOString()
+      };
+      
+      console.log('📈 MetadataClient Cache Status:');
+      console.table(cacheStatus);
+      
+      return status;
+    }
+    
+    /**
+     * Clear all cache
+     */
+    clearCache() {
+      console.log('🗑️ MetadataClient: Clearing all cache...');
+      this.cache.clear();
+      console.log('✅ MetadataClient: Cache cleared');
+    }
+    
+    /**
+     * Download metadata as JSON file
+     */
+    downloadMetadataAsJson(metadata = null) {
+      if (!metadata) {
+        if (window.ADONaturale_DebugMetadata) {
+          metadata = window.ADONaturale_DebugMetadata;
+        } else {
+          console.error('❌ No metadata available to download. Fetch metadata first.');
+          return;
+        }
+      }
+      
+      const filename = `ado-naturale-metadata-${metadata.organization}-${metadata.project}-${new Date().toISOString().split('T')[0]}.json`;
+      const blob = new Blob([JSON.stringify(metadata, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      
+      console.log(`💾 Downloaded metadata as: ${filename}`);
     }
   }
   
   // Make the class globally available
   window.ADONaturale_MetadataClient = MetadataClient;
+  
+  // 🔧 GLOBAL DEBUG HELPERS for easy console access
+  if (typeof window !== 'undefined') {
+    window.ADONaturale_Debug = {
+      /**
+       * Get current metadata (from cache if available)
+       */
+      async getMetadata() {
+        const client = new window.ADONaturale_MetadataClient();
+        return await client.getComprehensiveMetadata();
+      },
+      
+      /**
+       * Force refresh metadata (ignores cache)
+       */
+      async refreshMetadata() {
+        const client = new window.ADONaturale_MetadataClient();
+        return await client.forceRefreshMetadata();
+      },
+      
+      /**
+       * Get cache status
+       */
+      getCacheStatus() {
+        const client = new window.ADONaturale_MetadataClient();
+        return client.getCacheStatus();
+      },
+      
+      /**
+       * Clear cache
+       */
+      clearCache() {
+        const client = new window.ADONaturale_MetadataClient();
+        client.clearCache();
+      },
+      
+      /**
+       * Download metadata as JSON file
+       */
+      downloadMetadata() {
+        const client = new window.ADONaturale_MetadataClient();
+        client.downloadMetadataAsJson();
+      },
+      
+      /**
+       * Display help for debugging commands
+       */
+      help() {
+        console.group('🔧 ADO NATURALE DEBUG COMMANDS');
+        console.log('Use these commands in the browser console:');
+        console.log('');
+        console.log('📋 ADONaturale_Debug.getMetadata()       - Get current metadata');
+        console.log('🔄 ADONaturale_Debug.refreshMetadata()   - Force refresh metadata');
+        console.log('📈 ADONaturale_Debug.getCacheStatus()    - Show cache status');
+        console.log('🗑️ ADONaturale_Debug.clearCache()        - Clear all cache');
+        console.log('💾 ADONaturale_Debug.downloadMetadata()  - Download metadata as JSON');
+        console.log('');
+        console.log('🌐 window.ADONaturale_DebugMetadata      - Access last fetched metadata');
+        console.log('');
+        console.log('💡 Example usage:');
+        console.log('   await ADONaturale_Debug.refreshMetadata()');
+        console.log('   ADONaturale_Debug.downloadMetadata()');
+        console.groupEnd();
+      }
+    };
+    
+    // Show help on load
+    console.log('🔧 ADO Naturale Debug helpers loaded! Type ADONaturale_Debug.help() for commands.');
+  }
   
 })(); 

@@ -75,6 +75,10 @@
       
       try {
         this.metadata = await this.metadataLoadPromise;
+        
+        const isCached = this.metadata.timestamp && (Date.now() - this.metadata.timestamp) > 1000;
+        const ageHours = this.metadata.timestamp ? (Date.now() - this.metadata.timestamp) / (1000 * 60 * 60) : 0;
+        
         console.log('Enhanced NL Processor: Metadata loaded', {
           organization: this.metadata.organization,
           project: this.metadata.project,
@@ -82,8 +86,17 @@
           fieldsCount: Object.keys(this.metadata.fields).length,
           teamMembersCount: this.metadata.teamMembers.length,
           iterationsCount: this.metadata.iterations.length,
-          isFallback: this.metadata.isFallback
+          isFallback: this.metadata.isFallback,
+          isCached: isCached,
+          ageHours: Math.round(ageHours * 100) / 100,
+          nextRefresh: this.metadata.cacheInfo?.nextRefresh
         });
+        
+        if (isCached) {
+          console.log(`📂 Enhanced NL Processor: Using cached metadata (${Math.round(ageHours * 100) / 100} hours old)`);
+        } else {
+          console.log('🆕 Enhanced NL Processor: Using fresh metadata');
+        }
         
         return true;
       } catch (error) {
