@@ -13,7 +13,16 @@
     constructor() {
       this.metadataClient = new window.ADONaturale_MetadataClient();
       this.openaiClient = new window.ADONaturale_OpenAIClient();
-      this.fallbackProcessor = window.ADONaturale_NLProcessor ? new window.ADONaturale_NLProcessor() : null;
+      this.fallbackProcessor = null;
+      
+      // Initialize fallback processor if available
+      if (window.ADONaturale_NLProcessor) {
+        try {
+          this.fallbackProcessor = new window.ADONaturale_NLProcessor();
+        } catch (error) {
+          console.warn('Enhanced NL Processor: Could not initialize fallback processor:', error);
+        }
+      }
       
       this.metadata = null;
       this.metadataLoadPromise = null;

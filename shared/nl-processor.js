@@ -436,7 +436,7 @@
     }
   }
   
-  // Create global instance
-  window.ADONaturale_NLProcessor = new NaturalLanguageProcessor();
+  // Make the class globally available
+  window.ADONaturale_NLProcessor = NaturalLanguageProcessor;
   
 })(); 
