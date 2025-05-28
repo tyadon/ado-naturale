@@ -98,14 +98,17 @@
      */
     async processQuery(userInput, context = {}) {
       console.log('Enhanced NL Processor: Processing query:', userInput);
+      console.log('Enhanced NL Processor: Context:', context);
       
       // Ensure we're initialized
       if (!this.isInitialized) {
+        console.log('Enhanced NL Processor: Not initialized, initializing now...');
         await this.initialize();
       }
       
       // Validate input
       if (!userInput || typeof userInput !== 'string' || userInput.trim().length === 0) {
+        console.warn('Enhanced NL Processor: Empty or invalid query');
         return this.createErrorResult('Empty or invalid query');
       }
       
@@ -114,17 +117,41 @@
       try {
         // Enhance context with metadata
         const enhancedContext = await this.enhanceContext(context);
+        console.log('Enhanced NL Processor: Enhanced context prepared');
+        
+        // Check if AI processing is available and configured
+        const isAIConfigured = this.openaiClient.isConfigured();
+        const hasMetadata = !!this.metadata;
+        
+        console.log('Enhanced NL Processor: AI configured:', isAIConfigured);
+        console.log('Enhanced NL Processor: Has metadata:', hasMetadata);
         
         // Try AI-powered generation first
-        if (this.openaiClient.isConfigured() && this.metadata) {
-          const aiResult = await this.processWithAI(userInput, enhancedContext);
-          if (aiResult.success) {
-            aiResult.processingTime = Date.now() - startTime;
-            return aiResult;
+        if (isAIConfigured && hasMetadata) {
+          console.log('Enhanced NL Processor: Attempting AI processing...');
+          try {
+            const aiResult = await this.processWithAI(userInput, enhancedContext);
+            if (aiResult.success) {
+              console.log('Enhanced NL Processor: AI processing successful!');
+              aiResult.processingTime = Date.now() - startTime;
+              return aiResult;
+            } else {
+              console.warn('Enhanced NL Processor: AI processing returned unsuccessful result');
+            }
+          } catch (aiError) {
+            console.warn('Enhanced NL Processor: AI processing failed with error:', aiError);
+          }
+        } else {
+          if (!isAIConfigured) {
+            console.log('Enhanced NL Processor: Skipping AI processing - not configured');
+          }
+          if (!hasMetadata) {
+            console.log('Enhanced NL Processor: Skipping AI processing - no metadata');
           }
         }
         
         // Fallback to enhanced pattern matching
+        console.log('Enhanced NL Processor: Using enhanced pattern matching fallback');
         const patternResult = await this.processWithEnhancedPatterns(userInput, enhancedContext);
         patternResult.processingTime = Date.now() - startTime;
         return patternResult;
@@ -174,11 +201,21 @@
      */
     async processWithAI(userInput, context) {
       try {
-        console.log('Enhanced NL Processor: Using AI processing');
+        console.log('Enhanced NL Processor: Starting AI processing for query:', userInput);
+        console.log('Enhanced NL Processor: AI client configured:', this.openaiClient.isConfigured());
+        console.log('Enhanced NL Processor: Metadata available:', !!this.metadata);
         
         const result = await this.openaiClient.generateQueryUrl(userInput, this.metadata, context);
         
+        console.log('Enhanced NL Processor: AI client returned result:', {
+          success: result.success,
+          method: result.method,
+          confidence: result.confidence,
+          hasUrl: !!result.url
+        });
+        
         if (result.success) {
+          console.log('Enhanced NL Processor: AI processing completed successfully');
           return {
             success: true,
             url: result.url,
@@ -194,10 +231,11 @@
           };
         }
         
+        console.warn('Enhanced NL Processor: AI processing returned unsuccessful result');
         throw new Error('AI processing failed');
         
       } catch (error) {
-        console.warn('Enhanced NL Processor: AI processing failed:', error);
+        console.error('Enhanced NL Processor: AI processing failed with error:', error);
         throw error;
       }
     }

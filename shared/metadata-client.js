@@ -16,6 +16,13 @@
       this.project = this.extractProject();
       this.cache = new Map();
       this.cacheExpiry = 30 * 60 * 1000; // 30 minutes
+      
+      console.log('MetadataClient: Initialized with:', {
+        baseUrl: this.baseUrl,
+        organization: this.organization,
+        project: this.project,
+        currentUrl: window.location.href
+      });
     }
     
     /**
@@ -37,12 +44,23 @@
      */
     extractOrganization() {
       const url = window.location.href;
+      console.log('MetadataClient: Extracting organization from URL:', url);
+      
       if (url.includes('dev.azure.com')) {
         const match = url.match(/dev\.azure\.com\/(.+?)\//);
-        return match ? match[1] : null;
+        const org = match ? match[1] : null;
+        console.log('MetadataClient: Extracted organization (dev.azure.com):', org);
+        return org;
       } else if (url.includes('.visualstudio.com')) {
-        const match = url.match(/https:\/\/(.+?)\.visualstudio\.com/);
-        return match ? match[1] : null;
+        // For URLs like https://microsoft.visualstudio.com/microsoft/OS/_queries
+        // The organization could be either the subdomain or the first path segment
+        const subdomainMatch = url.match(/https:\/\/(.+?)\.visualstudio\.com/);
+        const pathMatch = url.match(/\.visualstudio\.com\/([^\/]+)/);
+        
+        // Prefer the first path segment if it exists, otherwise use subdomain
+        const org = pathMatch ? pathMatch[1] : (subdomainMatch ? subdomainMatch[1] : null);
+        console.log('MetadataClient: Extracted organization (visualstudio.com):', org);
+        return org;
       }
       return null;
     }
@@ -52,12 +70,20 @@
      */
     extractProject() {
       const url = window.location.href;
+      console.log('MetadataClient: Extracting project from URL:', url);
+      
       if (url.includes('dev.azure.com')) {
         const match = url.match(/dev\.azure\.com\/.+?\/(.+?)\//);
-        return match ? match[1] : null;
+        const project = match ? match[1] : null;
+        console.log('MetadataClient: Extracted project (dev.azure.com):', project);
+        return project;
       } else if (url.includes('.visualstudio.com')) {
-        const match = url.match(/\.visualstudio\.com\/(.+?)\//);
-        return match ? match[1] : null;
+        // For URLs like https://microsoft.visualstudio.com/microsoft/OS/_queries
+        // We need to extract the second path segment as the project
+        const match = url.match(/\.visualstudio\.com\/[^\/]+\/([^\/]+)/);
+        const project = match ? match[1] : null;
+        console.log('MetadataClient: Extracted project (visualstudio.com):', project);
+        return project;
       }
       return null;
     }
@@ -308,8 +334,19 @@
      * Get comprehensive metadata for AI processing
      */
     async getComprehensiveMetadata() {
+      console.log('MetadataClient: Starting comprehensive metadata fetch...');
+      
       try {
-        const [workItemTypes, allFields, iterations, areas, teamMembers] = await Promise.all([
+        // Check if we have valid organization and project
+        if (!this.organization || !this.project) {
+          console.warn('MetadataClient: Missing organization or project, using fallback metadata');
+          return this.getFallbackMetadata();
+        }
+        
+        console.log('MetadataClient: Fetching metadata for org:', this.organization, 'project:', this.project);
+        
+        // Fetch metadata with individual error handling
+        const results = await Promise.allSettled([
           this.getWorkItemTypeDefinitions(),
           this.getAllFields(),
           this.getIterations(),
@@ -317,20 +354,37 @@
           this.getTeamMembers()
         ]);
         
-        // Enhance fields with picklist values
+        const [workItemTypesResult, allFieldsResult, iterationsResult, areasResult, teamMembersResult] = results;
+        
+        // Extract successful results or use fallbacks
+        const workItemTypes = workItemTypesResult.status === 'fulfilled' ? workItemTypesResult.value : {};
+        const allFields = allFieldsResult.status === 'fulfilled' ? allFieldsResult.value : {};
+        const iterations = iterationsResult.status === 'fulfilled' ? iterationsResult.value : [];
+        const areas = areasResult.status === 'fulfilled' ? areasResult.value : [];
+        const teamMembers = teamMembersResult.status === 'fulfilled' ? teamMembersResult.value : [];
+        
+        // Log any failures
+        results.forEach((result, index) => {
+          const names = ['workItemTypes', 'fields', 'iterations', 'areas', 'teamMembers'];
+          if (result.status === 'rejected') {
+            console.warn(`MetadataClient: Failed to fetch ${names[index]}:`, result.reason);
+          }
+        });
+        
+        // Enhance fields with picklist values (with error handling)
         const enhancedFields = { ...allFields };
         for (const [fieldRef, field] of Object.entries(enhancedFields)) {
           if (field.isPicklist && field.picklistId) {
             try {
               field.allowedValues = await this.getPicklistValues(field.picklistId);
             } catch (error) {
-              console.warn(`Could not fetch picklist values for ${fieldRef}:`, error);
+              console.warn(`MetadataClient: Could not fetch picklist values for ${fieldRef}:`, error);
               field.allowedValues = [];
             }
           }
         }
         
-        return {
+        const metadata = {
           organization: this.organization,
           project: this.project,
           workItemTypes,
@@ -342,8 +396,18 @@
           queryOperators: this.getQueryOperators(),
           timestamp: Date.now()
         };
+        
+        console.log('MetadataClient: Successfully fetched metadata:', {
+          workItemTypesCount: Object.keys(workItemTypes).length,
+          fieldsCount: Object.keys(enhancedFields).length,
+          iterationsCount: iterations.length,
+          areasCount: areas.length,
+          teamMembersCount: teamMembers.length
+        });
+        
+        return metadata;
       } catch (error) {
-        console.error('Error fetching comprehensive metadata:', error);
+        console.error('MetadataClient: Error fetching comprehensive metadata:', error);
         return this.getFallbackMetadata();
       }
     }
