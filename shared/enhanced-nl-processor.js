@@ -454,7 +454,7 @@
       if (context.organization && context.project) {
         if (context.url?.includes('dev.azure.com')) {
           return `https://dev.azure.com/${context.organization}/${context.project}`;
-        } else {
+        } else if (context.url?.includes('.visualstudio.com')) {
           return `https://${context.organization}.visualstudio.com/${context.project}`;
         }
       }
@@ -465,8 +465,15 @@
         const match = currentUrl.match(/(https:\/\/dev\.azure\.com\/[^\/]+\/[^\/]+)/);
         return match ? match[1] : 'https://dev.azure.com/org/project';
       } else if (currentUrl.includes('.visualstudio.com')) {
-        const match = currentUrl.match(/(https:\/\/[^\/]+\.visualstudio\.com\/[^\/]+)/);
-        return match ? match[1] : 'https://org.visualstudio.com/project';
+        // Extract organization from subdomain and project from first path segment
+        const orgMatch = currentUrl.match(/https:\/\/(.+?)\.visualstudio\.com/);
+        const projectMatch = currentUrl.match(/\.visualstudio\.com\/([^\/\?]+)/);
+        
+        if (orgMatch && projectMatch) {
+          return `https://${orgMatch[1]}.visualstudio.com/${projectMatch[1]}`;
+        } else {
+          return 'https://org.visualstudio.com/project';
+        }
       }
       
       return 'https://dev.azure.com/org/project';

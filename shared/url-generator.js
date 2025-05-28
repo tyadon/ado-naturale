@@ -11,10 +11,21 @@
    */
   class URLGenerator {
     constructor() {
-      this.baseUrls = {
-        visualStudio: 'https://{organization}.visualstudio.com/{project}/_queries/query/',
-        devAzure: 'https://dev.azure.com/{organization}/{project}/_queries/query/'
-      };
+      // Remove hard-coded templates since we'll build URLs dynamically
+    }
+    
+    /**
+     * Build query URL based on the hosting environment
+     */
+    buildQueryUrl(organization, project, currentUrl) {
+      if (currentUrl.includes('dev.azure.com')) {
+        // dev.azure.com format: https://dev.azure.com/organization/project/_queries/query/
+        return `https://dev.azure.com/${organization}/${project}/_queries/query/`;
+      } else if (currentUrl.includes('.visualstudio.com')) {
+        // visualstudio.com format: https://organization.visualstudio.com/project/_queries/query/
+        return `https://${organization}.visualstudio.com/${project}/_queries/query/`;
+      }
+      throw new Error('Unsupported ADO hosting environment');
     }
     
     /**
@@ -30,17 +41,12 @@
         // Encode WIQL for URL
         const encodedWiql = encodeURIComponent(wiql);
         
-        // Build the URL base
-        let baseUrl;
-        if (context.baseUrl && context.baseUrl.includes('visualstudio.com')) {
-          baseUrl = this.baseUrls.visualStudio
-            .replace('{organization}', context.organization || '')
-            .replace('{project}', context.project || '');
-        } else {
-          baseUrl = this.baseUrls.devAzure
-            .replace('{organization}', context.organization || '')
-            .replace('{project}', context.project || '');
-        }
+        // Build the URL base using current context
+        const baseUrl = this.buildQueryUrl(
+          context.organization, 
+          context.project, 
+          context.url || window.location.href
+        );
         
         // Add the encoded WIQL
         const fullUrl = `${baseUrl}?wiql=${encodedWiql}`;

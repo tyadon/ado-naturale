@@ -75,12 +75,22 @@
     };
     
     // Extract organization and project from URL
-    const urlMatch = context.url.match(/https:\/\/(.+?)\.visualstudio\.com\/(.+?)\/_queries/) ||
-                    context.url.match(/https:\/\/dev\.azure\.com\/(.+?)\/(.+?)\/_queries/);
-    
-    if (urlMatch) {
-      context.organization = urlMatch[1];
-      context.project = urlMatch[2];
+    if (context.url.includes('dev.azure.com')) {
+      // dev.azure.com format: https://dev.azure.com/organization/project/...
+      const match = context.url.match(/https:\/\/dev\.azure\.com\/([^\/]+)\/([^\/]+)/);
+      if (match) {
+        context.organization = match[1];
+        context.project = match[2];
+      }
+    } else if (context.url.includes('.visualstudio.com')) {
+      // visualstudio.com format: https://organization.visualstudio.com/project/...
+      const orgMatch = context.url.match(/https:\/\/(.+?)\.visualstudio\.com/);
+      const projectMatch = context.url.match(/\.visualstudio\.com\/([^\/\?]+)/);
+      
+      if (orgMatch && projectMatch) {
+        context.organization = orgMatch[1];
+        context.project = projectMatch[1];
+      }
     }
     
     // Try to extract current user information

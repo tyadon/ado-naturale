@@ -54,7 +54,9 @@
         const match = url.match(/dev\.azure\.com\/.+?\/(.+?)\//);
         return match ? match[1] : null;
       } else if (url.includes('.visualstudio.com')) {
-        const match = url.match(/\.visualstudio\.com\/(.+?)\//);
+        // For visualstudio.com: https://organization.visualstudio.com/project/...
+        // Project is the first path segment
+        const match = url.match(/\.visualstudio\.com\/([^\/\?]+)/);
         return match ? match[1] : null;
       }
       return null;

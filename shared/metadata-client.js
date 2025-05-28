@@ -37,7 +37,7 @@
         console.log('MetadataClient: Extracted base URL (dev.azure.com):', baseUrl);
         return baseUrl;
       } else if (url.includes('.visualstudio.com')) {
-        // Extract just the protocol and domain, not any path components
+        // Extract the full subdomain + domain (e.g., https://microsoft.visualstudio.com)
         const match = url.match(/https:\/\/(.+?)\.visualstudio\.com/);
         const baseUrl = match ? match[0] : null;
         console.log('MetadataClient: Extracted base URL (visualstudio.com):', baseUrl);
@@ -54,18 +54,16 @@
       console.log('MetadataClient: Extracting organization from URL:', url);
       
       if (url.includes('dev.azure.com')) {
+        // For dev.azure.com: https://dev.azure.com/organization/project/...
         const match = url.match(/dev\.azure\.com\/(.+?)\//);
         const org = match ? match[1] : null;
         console.log('MetadataClient: Extracted organization (dev.azure.com):', org);
         return org;
       } else if (url.includes('.visualstudio.com')) {
-        // For URLs like https://microsoft.visualstudio.com/microsoft/OS/_queries
-        // The organization could be either the subdomain or the first path segment
-        const subdomainMatch = url.match(/https:\/\/(.+?)\.visualstudio\.com/);
-        const pathMatch = url.match(/\.visualstudio\.com\/([^\/]+)/);
-        
-        // Prefer the first path segment if it exists, otherwise use subdomain
-        const org = pathMatch ? pathMatch[1] : (subdomainMatch ? subdomainMatch[1] : null);
+        // For visualstudio.com: https://organization.visualstudio.com/project/...
+        // Organization is the subdomain
+        const match = url.match(/https:\/\/(.+?)\.visualstudio\.com/);
+        const org = match ? match[1] : null;
         console.log('MetadataClient: Extracted organization (visualstudio.com):', org);
         return org;
       }
@@ -80,19 +78,48 @@
       console.log('MetadataClient: Extracting project from URL:', url);
       
       if (url.includes('dev.azure.com')) {
+        // For dev.azure.com: https://dev.azure.com/organization/project/...
         const match = url.match(/dev\.azure\.com\/.+?\/(.+?)\//);
         const project = match ? match[1] : null;
         console.log('MetadataClient: Extracted project (dev.azure.com):', project);
         return project;
       } else if (url.includes('.visualstudio.com')) {
-        // For URLs like https://microsoft.visualstudio.com/microsoft/OS/_queries
-        // We need to extract the second path segment as the project
-        const match = url.match(/\.visualstudio\.com\/[^\/]+\/([^\/]+)/);
+        // For visualstudio.com: https://organization.visualstudio.com/project/...
+        // Project is the first path segment
+        const match = url.match(/\.visualstudio\.com\/([^\/\?]+)/);
         const project = match ? match[1] : null;
         console.log('MetadataClient: Extracted project (visualstudio.com):', project);
         return project;
       }
       return null;
+    }
+    
+    /**
+     * Build API URL based on the hosting environment
+     */
+    buildApiUrl(endpoint) {
+      if (this.baseUrl.includes('dev.azure.com')) {
+        // dev.azure.com format: https://dev.azure.com/organization/project/_apis/...
+        return `${this.baseUrl}/${this.organization}/${this.project}/_apis/${endpoint}`;
+      } else if (this.baseUrl.includes('.visualstudio.com')) {
+        // visualstudio.com format: https://organization.visualstudio.com/project/_apis/...
+        return `${this.baseUrl}/${this.project}/_apis/${endpoint}`;
+      }
+      throw new Error('Unsupported ADO hosting environment');
+    }
+    
+    /**
+     * Build organization-level API URL (no project in path)
+     */
+    buildOrgApiUrl(endpoint) {
+      if (this.baseUrl.includes('dev.azure.com')) {
+        // dev.azure.com format: https://dev.azure.com/organization/_apis/...
+        return `${this.baseUrl}/${this.organization}/_apis/${endpoint}`;
+      } else if (this.baseUrl.includes('.visualstudio.com')) {
+        // visualstudio.com format: https://organization.visualstudio.com/_apis/...
+        return `${this.baseUrl}/_apis/${endpoint}`;
+      }
+      throw new Error('Unsupported ADO hosting environment');
     }
     
     /**
@@ -157,9 +184,7 @@
       const cacheKey = `workItemTypes_${this.organization}_${this.project}`;
       
       return this.getCachedOrFetch(cacheKey, async () => {
-        const url = this.baseUrl.includes('.visualstudio.com') 
-          ? `${this.baseUrl}/${this.project}/_apis/wit/workitemtypes?$expand=fields&api-version=6.0`
-          : `${this.baseUrl}/${this.organization}/${this.project}/_apis/wit/workitemtypes?$expand=fields&api-version=6.0`;
+        const url = this.buildApiUrl('wit/workitemtypes?$expand=fields&api-version=6.0');
         
         console.log('MetadataClient: Fetching work item types from URL:', url);
         const response = await this.makeRequest(url);
@@ -203,9 +228,7 @@
       const cacheKey = `allFields_${this.organization}_${this.project}`;
       
       return this.getCachedOrFetch(cacheKey, async () => {
-        const url = this.baseUrl.includes('.visualstudio.com') 
-          ? `${this.baseUrl}/${this.project}/_apis/wit/fields?api-version=6.0`
-          : `${this.baseUrl}/${this.organization}/${this.project}/_apis/wit/fields?api-version=6.0`;
+        const url = this.buildApiUrl('wit/fields?api-version=6.0');
         
         console.log('MetadataClient: Fetching fields from URL:', url);
         const response = await this.makeRequest(url);
@@ -242,9 +265,7 @@
       const cacheKey = `picklist_${picklistId}`;
       
       return this.getCachedOrFetch(cacheKey, async () => {
-        const url = this.baseUrl.includes('.visualstudio.com') 
-          ? `${this.baseUrl}/_apis/work/processes/lists/${picklistId}?api-version=6.0`
-          : `${this.baseUrl}/${this.organization}/_apis/work/processes/lists/${picklistId}?api-version=6.0`;
+        const url = this.buildOrgApiUrl(`work/processes/lists/${picklistId}?api-version=6.0`);
         
         console.log('MetadataClient: Fetching picklist values from URL:', url);
         const response = await this.makeRequest(url);
@@ -260,11 +281,7 @@
       const cacheKey = `iterations_${this.organization}_${this.project}`;
       
       return this.getCachedOrFetch(cacheKey, async () => {
-        // For visualstudio.com URLs, organization is in subdomain, so URL is baseUrl/project/_apis/...
-        // For dev.azure.com URLs, URL is baseUrl/organization/project/_apis/...
-        const url = this.baseUrl.includes('.visualstudio.com') 
-          ? `${this.baseUrl}/${this.project}/_apis/work/teamsettings/iterations?api-version=6.0`
-          : `${this.baseUrl}/${this.organization}/${this.project}/_apis/work/teamsettings/iterations?api-version=6.0`;
+        const url = this.buildApiUrl('work/teamsettings/iterations?api-version=6.0');
         
         console.log('MetadataClient: Fetching iterations from URL:', url);
         const response = await this.makeRequest(url);
@@ -287,9 +304,7 @@
       const cacheKey = `areas_${this.organization}_${this.project}`;
       
       return this.getCachedOrFetch(cacheKey, async () => {
-        const url = this.baseUrl.includes('.visualstudio.com') 
-          ? `${this.baseUrl}/${this.project}/_apis/wit/classificationnodes/areas?$depth=10&api-version=6.0`
-          : `${this.baseUrl}/${this.organization}/${this.project}/_apis/wit/classificationnodes/areas?$depth=10&api-version=6.0`;
+        const url = this.buildApiUrl('wit/classificationnodes/areas?$depth=10&api-version=6.0');
         
         console.log('MetadataClient: Fetching areas from URL:', url);
         const response = await this.makeRequest(url);
@@ -325,9 +340,7 @@
       
       return this.getCachedOrFetch(cacheKey, async () => {
         try {
-          const url = this.baseUrl.includes('.visualstudio.com') 
-            ? `${this.baseUrl}/_apis/projects/${this.project}/teams?api-version=6.0`
-            : `${this.baseUrl}/${this.organization}/_apis/projects/${this.project}/teams?api-version=6.0`;
+          const url = this.buildOrgApiUrl(`projects/${this.project}/teams?api-version=6.0`);
           
           console.log('MetadataClient: Fetching teams from URL:', url);
           const teamsResponse = await this.makeRequest(url);
@@ -336,9 +349,7 @@
           
           for (const team of teamsResponse.value) {
             try {
-              const membersUrl = this.baseUrl.includes('.visualstudio.com') 
-                ? `${this.baseUrl}/_apis/projects/${this.project}/teams/${team.id}/members?api-version=6.0`
-                : `${this.baseUrl}/${this.organization}/_apis/projects/${this.project}/teams/${team.id}/members?api-version=6.0`;
+              const membersUrl = this.buildOrgApiUrl(`projects/${this.project}/teams/${team.id}/members?api-version=6.0`);
               
               console.log('MetadataClient: Fetching team members from URL:', membersUrl);
               const membersResponse = await this.makeRequest(membersUrl);

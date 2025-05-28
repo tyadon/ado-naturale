@@ -188,11 +188,18 @@ Query Operators:
      * Build context section of the prompt
      */
     buildContextPrompt(context) {
-      const baseUrl = context.organization && context.project 
-        ? (context.url?.includes('dev.azure.com') 
-          ? `https://dev.azure.com/${context.organization}/${context.project}`
-          : `https://${context.organization}.visualstudio.com/${context.project}`)
-        : 'https://dev.azure.com/{org}/{project}';
+      let baseUrl;
+      if (context.organization && context.project) {
+        if (context.url?.includes('dev.azure.com')) {
+          baseUrl = `https://dev.azure.com/${context.organization}/${context.project}`;
+        } else if (context.url?.includes('.visualstudio.com')) {
+          baseUrl = `https://${context.organization}.visualstudio.com/${context.project}`;
+        } else {
+          baseUrl = 'https://dev.azure.com/{org}/{project}';
+        }
+      } else {
+        baseUrl = 'https://dev.azure.com/{org}/{project}';
+      }
 
       return `CONTEXT:
 
@@ -206,9 +213,20 @@ URL Format: {baseUrl}/_queries/query/?wiql={encoded_wiql_query}`;
      * Build examples section of the prompt
      */
     buildExamplesPrompt(metadata) {
-      const baseUrl = metadata.organization && metadata.project
-        ? `https://dev.azure.com/${metadata.organization}/${metadata.project}`
-        : 'https://dev.azure.com/{org}/{project}';
+      let baseUrl;
+      if (metadata.organization && metadata.project) {
+        // Determine hosting environment from the current URL or context
+        const currentUrl = window.location.href;
+        if (currentUrl.includes('dev.azure.com')) {
+          baseUrl = `https://dev.azure.com/${metadata.organization}/${metadata.project}`;
+        } else if (currentUrl.includes('.visualstudio.com')) {
+          baseUrl = `https://${metadata.organization}.visualstudio.com/${metadata.project}`;
+        } else {
+          baseUrl = `https://dev.azure.com/${metadata.organization}/${metadata.project}`;
+        }
+      } else {
+        baseUrl = 'https://dev.azure.com/{org}/{project}';
+      }
 
       return `EXAMPLES:
 

@@ -98,6 +98,12 @@
         <label for="project">Project:</label>
         <input type="text" id="project" value="yourproject">
         
+        <label for="hostingType">Hosting Type:</label>
+        <select id="hostingType">
+            <option value="dev.azure.com">dev.azure.com</option>
+            <option value="visualstudio.com">visualstudio.com</option>
+        </select>
+        
         <button id="generateButton">Generate Query URL</button>
         
         <div class="result" id="processedResult" style="display: none;"></div>
@@ -139,7 +145,6 @@
                 
                 // Generate URL
                 const url = generateQueryUrl(processedQuery, {
-                    url: `https://dev.azure.com/${organization}/${project}/_queries`,
                     organization,
                     project
                 });
@@ -323,8 +328,17 @@
             
             // Generate URL
             function generateQueryUrl(processedQuery, context) {
-                // Determine base URL
-                const baseUrl = `https://dev.azure.com/${context.organization}/${context.project}/_queries/query/`;
+                // Build URL based on hosting environment
+                let baseUrl;
+                const hostingType = document.getElementById('hostingType')?.value || 'dev.azure.com';
+                
+                if (hostingType === 'visualstudio.com') {
+                    // visualstudio.com format: https://organization.visualstudio.com/project/_queries/query/
+                    baseUrl = `https://${context.organization}.visualstudio.com/${context.project}/_queries/query/`;
+                } else {
+                    // dev.azure.com format: https://dev.azure.com/organization/project/_queries/query/
+                    baseUrl = `https://dev.azure.com/${context.organization}/${context.project}/_queries/query/`;
+                }
                 
                 // Build the WIQL query
                 const wiql = generateWIQL(processedQuery);

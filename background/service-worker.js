@@ -313,12 +313,17 @@ async function processNaturalLanguage(query, context) {
  * Generate Azure DevOps query URL from processed query
  */
 async function generateQueryUrl(processedQuery, context) {
-  // Determine base URL
+  // Build URL based on hosting environment
   let baseUrl;
-  if (context.url.includes('visualstudio.com')) {
+  if (context.url.includes('dev.azure.com')) {
+    // dev.azure.com format: https://dev.azure.com/organization/project/_queries/query/
+    baseUrl = `https://dev.azure.com/${context.organization}/${context.project}/_queries/query/`;
+  } else if (context.url.includes('.visualstudio.com')) {
+    // visualstudio.com format: https://organization.visualstudio.com/project/_queries/query/
+    // Organization is in subdomain, project is first path segment
     baseUrl = `https://${context.organization}.visualstudio.com/${context.project}/_queries/query/`;
   } else {
-    baseUrl = `https://dev.azure.com/${context.organization}/${context.project}/_queries/query/`;
+    throw new Error('Unsupported ADO hosting environment');
   }
   
   // Build the WIQL query
