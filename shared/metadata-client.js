@@ -6,12 +6,20 @@
 (function() {
   'use strict';
   
+  // Singleton instance
+  let metadataClientInstance = null;
+  
   /**
    * Metadata Client class for fetching ADO field information
    */
   class MetadataClient {
     constructor() {
-      console.log('MetadataClient: Constructor called');
+      // Return singleton instance if it exists
+      if (metadataClientInstance) {
+        return metadataClientInstance;
+      }
+      
+      console.log('MetadataClient: Creating new singleton instance');
       console.log('MetadataClient: Current window.location.href:', window.location.href);
       
       this.baseUrl = this.extractBaseUrl();
@@ -19,13 +27,15 @@
       this.project = this.extractProject();
       this.cache = new Map();
       this.cacheExpiry = 24 * 60 * 60 * 1000; // 24 hours (daily cache)
+      this.storageKey = `adoNaturale_metadata_${this.organization}_${this.project}`;
       
       console.log('MetadataClient: Initialized with:', {
         baseUrl: this.baseUrl,
         organization: this.organization,
         project: this.project,
         currentUrl: window.location.href,
-        cacheExpiryHours: 24
+        cacheExpiryHours: 24,
+        storageKey: this.storageKey
       });
       
       // Additional validation
@@ -44,6 +54,12 @@
           organization: this.organization
         });
       }
+      
+      // Set singleton instance
+      metadataClientInstance = this;
+      
+      // Load cached data from storage on initialization
+      this.loadCacheFromStorage();
     }
     
     /**
@@ -217,21 +233,40 @@
      */
     async getCachedOrFetch(key, fetchFunction) {
       const cached = this.cache.get(key);
-      if (cached && (Date.now() - cached.timestamp) < this.cacheExpiry) {
+      const now = Date.now();
+      
+      // Check if cached data exists and is not expired
+      if (cached && (now - cached.timestamp) < this.cacheExpiry) {
+        const ageHours = Math.round((now - cached.timestamp) / (1000 * 60 * 60) * 100) / 100;
+        console.log(`📂 MetadataClient: Using cached data for ${key} (${ageHours} hours old)`);
         return cached.data;
+      }
+      
+      // If cached data exists but is expired
+      if (cached) {
+        const ageHours = Math.round((now - cached.timestamp) / (1000 * 60 * 60) * 100) / 100;
+        console.log(`⏰ MetadataClient: Cached data for ${key} expired (${ageHours} hours old), fetching fresh data`);
+      } else {
+        console.log(`🆕 MetadataClient: No cached data for ${key}, fetching fresh data`);
       }
       
       try {
         const data = await fetchFunction();
         this.cache.set(key, {
           data,
-          timestamp: Date.now()
+          timestamp: now
         });
+        
+        // Save to persistent storage
+        this.saveCacheToStorage();
+        
+        console.log(`✅ MetadataClient: Cached fresh data for ${key}`);
         return data;
       } catch (error) {
         // Return cached data if available, even if expired
         if (cached) {
-          console.warn('Using expired cache due to fetch error:', error);
+          const ageHours = Math.round((now - cached.timestamp) / (1000 * 60 * 60) * 100) / 100;
+          console.warn(`⚠️ MetadataClient: Using expired cache for ${key} due to fetch error (${ageHours} hours old):`, error);
           return cached.data;
         }
         throw error;
@@ -694,6 +729,7 @@ URL.revokeObjectURL(url);
     async forceRefreshMetadata() {
       console.log('🔄 MetadataClient: Force refreshing metadata...');
       this.cache.clear();
+      localStorage.removeItem(this.storageKey);
       const metadata = await this.getComprehensiveMetadata();
       console.log('✅ MetadataClient: Force refresh completed');
       return metadata;
@@ -705,10 +741,11 @@ URL.revokeObjectURL(url);
     getCacheStatus() {
       const cacheKeys = Array.from(this.cache.keys());
       const cacheStatus = {};
+      const now = Date.now();
       
       cacheKeys.forEach(key => {
         const cached = this.cache.get(key);
-        const age = Date.now() - cached.timestamp;
+        const age = now - cached.timestamp;
         const isExpired = age > this.cacheExpiry;
         
         cacheStatus[key] = {
@@ -724,22 +761,30 @@ URL.revokeObjectURL(url);
         cacheExpiryHours: this.cacheExpiry / (1000 * 60 * 60),
         totalCacheEntries: cacheKeys.length,
         cacheEntries: cacheStatus,
-        nextRefreshAfter: new Date(Date.now() + this.cacheExpiry).toISOString()
+        nextRefreshAfter: new Date(now + this.cacheExpiry).toISOString(),
+        storageKey: this.storageKey,
+        isSingleton: metadataClientInstance === this
       };
       
       console.log('📈 MetadataClient Cache Status:');
       console.table(cacheStatus);
+      console.log('Storage Info:', {
+        storageKey: this.storageKey,
+        hasStorageData: !!localStorage.getItem(this.storageKey),
+        isSingleton: metadataClientInstance === this
+      });
       
       return status;
     }
     
     /**
-     * Clear all cache
+     * Clear all cache (memory and storage)
      */
     clearCache() {
       console.log('🗑️ MetadataClient: Clearing all cache...');
       this.cache.clear();
-      console.log('✅ MetadataClient: Cache cleared');
+      localStorage.removeItem(this.storageKey);
+      console.log('✅ MetadataClient: Cache cleared (memory and storage)');
     }
     
     /**
@@ -766,6 +811,68 @@ URL.revokeObjectURL(url);
       
       console.log(`💾 Downloaded metadata as: ${filename}`);
     }
+    
+    /**
+     * Save cached data to storage
+     */
+    saveCacheToStorage() {
+      try {
+        const cacheData = JSON.stringify(Array.from(this.cache.entries()));
+        localStorage.setItem(this.storageKey, cacheData);
+        console.log('MetadataClient: Saved cached data to storage');
+      } catch (error) {
+        console.warn('MetadataClient: Failed to save cache to storage:', error);
+      }
+    }
+    
+    /**
+     * Load cached data from storage on initialization
+     */
+    loadCacheFromStorage() {
+      try {
+        const cachedData = localStorage.getItem(this.storageKey);
+        if (cachedData) {
+          const cacheEntries = JSON.parse(cachedData);
+          this.cache = new Map(cacheEntries);
+          
+          // Check if any cached data is still valid
+          const now = Date.now();
+          let validEntries = 0;
+          let expiredEntries = 0;
+          
+          for (const [key, value] of this.cache.entries()) {
+            if (value && value.timestamp && (now - value.timestamp) < this.cacheExpiry) {
+              validEntries++;
+            } else {
+              expiredEntries++;
+            }
+          }
+          
+          console.log('MetadataClient: Loaded cached data from storage:', {
+            totalEntries: this.cache.size,
+            validEntries,
+            expiredEntries,
+            storageKey: this.storageKey
+          });
+          
+          // Clean up expired entries
+          if (expiredEntries > 0) {
+            for (const [key, value] of this.cache.entries()) {
+              if (!value || !value.timestamp || (now - value.timestamp) >= this.cacheExpiry) {
+                this.cache.delete(key);
+              }
+            }
+            this.saveCacheToStorage();
+            console.log(`🗑️ MetadataClient: Cleaned up ${expiredEntries} expired cache entries`);
+          }
+        } else {
+          console.log('MetadataClient: No cached data found in storage');
+        }
+      } catch (error) {
+        console.warn('MetadataClient: Failed to load cache from storage:', error);
+        this.cache = new Map(); // Reset to empty cache
+      }
+    }
   }
   
   // Make the class globally available
@@ -778,7 +885,7 @@ URL.revokeObjectURL(url);
        * Get current metadata (from cache if available)
        */
       async getMetadata() {
-        const client = new window.ADONaturale_MetadataClient();
+        const client = new window.ADONaturale_MetadataClient(); // Uses singleton
         return await client.getComprehensiveMetadata();
       },
       
@@ -786,7 +893,7 @@ URL.revokeObjectURL(url);
        * Force refresh metadata (ignores cache)
        */
       async refreshMetadata() {
-        const client = new window.ADONaturale_MetadataClient();
+        const client = new window.ADONaturale_MetadataClient(); // Uses singleton
         return await client.forceRefreshMetadata();
       },
       
@@ -794,15 +901,15 @@ URL.revokeObjectURL(url);
        * Get cache status
        */
       getCacheStatus() {
-        const client = new window.ADONaturale_MetadataClient();
+        const client = new window.ADONaturale_MetadataClient(); // Uses singleton
         return client.getCacheStatus();
       },
       
       /**
-       * Clear cache
+       * Clear cache (memory and storage)
        */
       clearCache() {
-        const client = new window.ADONaturale_MetadataClient();
+        const client = new window.ADONaturale_MetadataClient(); // Uses singleton
         client.clearCache();
       },
       
@@ -810,8 +917,22 @@ URL.revokeObjectURL(url);
        * Download metadata as JSON file
        */
       downloadMetadata() {
-        const client = new window.ADONaturale_MetadataClient();
+        const client = new window.ADONaturale_MetadataClient(); // Uses singleton
         client.downloadMetadataAsJson();
+      },
+      
+      /**
+       * Get singleton instance info
+       */
+      getSingletonInfo() {
+        const client1 = new window.ADONaturale_MetadataClient();
+        const client2 = new window.ADONaturale_MetadataClient();
+        console.log('Singleton test:', {
+          sameInstance: client1 === client2,
+          cacheSize: client1.cache.size,
+          storageKey: client1.storageKey
+        });
+        return client1 === client2;
       },
       
       /**
@@ -826,18 +947,21 @@ URL.revokeObjectURL(url);
         console.log('📈 ADONaturale_Debug.getCacheStatus()    - Show cache status');
         console.log('🗑️ ADONaturale_Debug.clearCache()        - Clear all cache');
         console.log('💾 ADONaturale_Debug.downloadMetadata()  - Download metadata as JSON');
+        console.log('🔧 ADONaturale_Debug.getSingletonInfo()  - Test singleton pattern');
         console.log('');
         console.log('🌐 window.ADONaturale_DebugMetadata      - Access last fetched metadata');
         console.log('');
         console.log('💡 Example usage:');
         console.log('   await ADONaturale_Debug.refreshMetadata()');
         console.log('   ADONaturale_Debug.downloadMetadata()');
+        console.log('   ADONaturale_Debug.getSingletonInfo()');
         console.groupEnd();
       }
     };
     
     // Show help on load
     console.log('🔧 ADO Naturale Debug helpers loaded! Type ADONaturale_Debug.help() for commands.');
+    console.log('🔧 Singleton MetadataClient pattern enabled for persistent 24-hour caching.');
   }
   
 })(); 

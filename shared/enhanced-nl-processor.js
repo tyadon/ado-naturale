@@ -11,7 +11,7 @@
    */
   class EnhancedNLProcessor {
     constructor() {
-      this.metadataClient = new window.ADONaturale_MetadataClient();
+      this.metadataClient = new window.ADONaturale_MetadataClient(); // Uses singleton
       this.openaiClient = new window.ADONaturale_OpenAIClient();
       this.fallbackProcessor = null;
       
@@ -27,6 +27,8 @@
       this.metadata = null;
       this.metadataLoadPromise = null;
       this.isInitialized = false;
+      
+      console.log('Enhanced NL Processor: Constructor completed, using singleton MetadataClient');
     }
     
     /**
@@ -68,9 +70,23 @@
      */
     async loadMetadata() {
       if (this.metadataLoadPromise) {
+        console.log('Enhanced NL Processor: Metadata load already in progress, waiting...');
         return this.metadataLoadPromise;
       }
       
+      // Check if we already have valid cached metadata from the singleton
+      if (this.metadata && this.metadata.timestamp) {
+        const ageMs = Date.now() - this.metadata.timestamp;
+        const cacheExpiry = 24 * 60 * 60 * 1000; // 24 hours
+        
+        if (ageMs < cacheExpiry) {
+          const ageHours = Math.round(ageMs / (1000 * 60 * 60) * 100) / 100;
+          console.log(`📂 Enhanced NL Processor: Using existing cached metadata (${ageHours} hours old)`);
+          return true;
+        }
+      }
+      
+      console.log('Enhanced NL Processor: Loading metadata from singleton client...');
       this.metadataLoadPromise = this.metadataClient.getComprehensiveMetadata();
       
       try {
@@ -89,19 +105,24 @@
           isFallback: this.metadata.isFallback,
           isCached: isCached,
           ageHours: Math.round(ageHours * 100) / 100,
-          nextRefresh: this.metadata.cacheInfo?.nextRefresh
+          nextRefresh: this.metadata.cacheInfo?.nextRefresh,
+          usingSingleton: true
         });
         
         if (isCached) {
-          console.log(`📂 Enhanced NL Processor: Using cached metadata (${Math.round(ageHours * 100) / 100} hours old)`);
+          console.log(`📂 Enhanced NL Processor: Using cached metadata from singleton (${Math.round(ageHours * 100) / 100} hours old)`);
         } else {
-          console.log('🆕 Enhanced NL Processor: Using fresh metadata');
+          console.log('🆕 Enhanced NL Processor: Using fresh metadata from singleton');
         }
+        
+        // Clear the promise since we're done
+        this.metadataLoadPromise = null;
         
         return true;
       } catch (error) {
         console.error('Enhanced NL Processor: Failed to load metadata:', error);
         this.metadata = null;
+        this.metadataLoadPromise = null;
         return false;
       }
     }
