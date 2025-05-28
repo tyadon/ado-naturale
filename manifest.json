@@ -1,0 +1,74 @@
+{
+  "manifest_version": 3,
+  "name": "ADO Naturale - Azure DevOps Natural Language Query",
+  "version": "1.0.0",
+  "description": "Query Azure DevOps using natural language - converts your questions into WIQL queries",
+  
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting"
+  ],
+  
+  "host_permissions": [
+    "https://*.visualstudio.com/*",
+    "https://dev.azure.com/*",
+    "https://*.azure.com/*"
+  ],
+  
+  "background": {
+    "service_worker": "background/service-worker.js"
+  },
+  
+  "content_scripts": [
+    {
+      "matches": [
+        "https://*.visualstudio.com/*/_queries*",
+        "https://dev.azure.com/*/_queries*"
+      ],
+      "js": [
+        "shared/api-client.js",
+        "shared/nl-processor.js",
+        "shared/wiql-generator.js",
+        "content/query-executor.js",
+        "content/ui-injector.js",
+        "content/content-script.js"
+      ],
+      "css": [
+        "styles/content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  
+  "action": {
+    "default_popup": "popup/popup.html",
+    "default_title": "ADO Naturale",
+    "default_icon": {
+      "16": "assets/icons/icon16.png",
+      "32": "assets/icons/icon32.png",
+      "48": "assets/icons/icon48.png",
+      "128": "assets/icons/icon128.png"
+    }
+  },
+  
+  "icons": {
+    "16": "assets/icons/icon16.png",
+    "32": "assets/icons/icon32.png",
+    "48": "assets/icons/icon48.png",
+    "128": "assets/icons/icon128.png"
+  },
+  
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "styles/content.css",
+        "assets/icons/*"
+      ],
+      "matches": [
+        "https://*.visualstudio.com/*",
+        "https://dev.azure.com/*"
+      ]
+    }
+  ]
+} 
