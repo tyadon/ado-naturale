@@ -200,44 +200,146 @@
   });
   
   /**
-   * Handle messages from background script
+   * Handle messages from popup and background script
    */
-  chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-    switch (request.action) {
-      case 'getPageContext':
-        sendResponse({ context: currentContext });
+  chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    console.log('ADO Naturale: Received message:', message);
+    
+    switch (message.action) {
+      case 'getMetadataStatus':
+        handleGetMetadataStatus(sendResponse);
         break;
         
-      case 'reinitialize':
-        isInitialized = false;
-        initialize();
-        sendResponse({ success: true });
+      case 'getMetadataInfo':
+        handleGetMetadataInfo(sendResponse);
         break;
         
-      case 'toggleExtension':
-        extensionEnabled = request.enabled;
-        if (!extensionEnabled && isInitialized) {
-          // Remove UI components
-          if (typeof window.ADONaturale_UIInjector !== 'undefined') {
-            window.ADONaturale_UIInjector.removeInterface();
-          }
-          isInitialized = false;
-        } else if (extensionEnabled && !isInitialized) {
-          initialize();
-        }
-        sendResponse({ success: true });
+      case 'refreshMetadata':
+        handleRefreshMetadata(sendResponse);
+        break;
+        
+      case 'testOpenAIConnection':
+        handleTestOpenAIConnection(message.config, sendResponse);
         break;
         
       default:
-        sendResponse({ error: 'Unknown action' });
+        sendResponse({ success: false, error: 'Unknown action' });
     }
+    
+    // Return true to indicate we'll send a response asynchronously
+    return true;
   });
   
-  // Expose global functions for debugging
-  window.ADONaturale_Debug = {
-    getContext: () => currentContext,
-    isInitialized: () => isInitialized,
-    reinitialize: initialize
-  };
+  /**
+   * Handle metadata status request
+   */
+  async function handleGetMetadataStatus(sendResponse) {
+    try {
+      if (window.ADONaturale_EnhancedNLProcessor) {
+        const processor = new window.ADONaturale_EnhancedNLProcessor();
+        const stats = processor.getStats();
+        
+        sendResponse({
+          success: true,
+          hasMetadata: stats.hasMetadata,
+          isInitialized: stats.isInitialized,
+          isOpenAIConfigured: stats.isOpenAIConfigured
+        });
+      } else {
+        sendResponse({ success: false, error: 'Enhanced processor not available' });
+      }
+    } catch (error) {
+      console.error('ADO Naturale: Error getting metadata status:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+  
+  /**
+   * Handle metadata info request
+   */
+  async function handleGetMetadataInfo(sendResponse) {
+    try {
+      if (window.ADONaturale_MetadataClient) {
+        const metadataClient = new window.ADONaturale_MetadataClient();
+        const metadata = await metadataClient.getComprehensiveMetadata();
+        
+        sendResponse({
+          success: true,
+          metadata: metadata
+        });
+      } else {
+        sendResponse({ success: false, error: 'Metadata client not available' });
+      }
+    } catch (error) {
+      console.error('ADO Naturale: Error getting metadata info:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+  
+  /**
+   * Handle metadata refresh request
+   */
+  async function handleRefreshMetadata(sendResponse) {
+    try {
+      if (window.ADONaturale_MetadataClient) {
+        const metadataClient = new window.ADONaturale_MetadataClient();
+        
+        // Clear cache and reload metadata
+        metadataClient.cache.clear();
+        const metadata = await metadataClient.getComprehensiveMetadata();
+        
+        // If we have an enhanced processor, reinitialize it
+        if (window.ADONaturale_EnhancedNLProcessor) {
+          const processor = new window.ADONaturale_EnhancedNLProcessor();
+          processor.metadata = null;
+          processor.metadataLoadPromise = null;
+          processor.isInitialized = false;
+          await processor.initialize();
+        }
+        
+        sendResponse({
+          success: true,
+          metadata: metadata
+        });
+      } else {
+        sendResponse({ success: false, error: 'Metadata client not available' });
+      }
+    } catch (error) {
+      console.error('ADO Naturale: Error refreshing metadata:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+  
+  /**
+   * Handle OpenAI connection test
+   */
+  async function handleTestOpenAIConnection(config, sendResponse) {
+    try {
+      if (window.ADONaturale_OpenAIClient) {
+        const openaiClient = new window.ADONaturale_OpenAIClient();
+        openaiClient.configure(config);
+        
+        const testResult = await openaiClient.testConnection();
+        
+        sendResponse({
+          success: testResult.success,
+          error: testResult.error,
+          response: testResult.response
+        });
+      } else {
+        sendResponse({ success: false, error: 'OpenAI client not available' });
+      }
+    } catch (error) {
+      console.error('ADO Naturale: Error testing OpenAI connection:', error);
+      sendResponse({ success: false, error: error.message });
+    }
+  }
+
+  // Cleanup on page unload
+  window.addEventListener('beforeunload', () => {
+    if (observer) {
+      observer.disconnect();
+    }
+  });
   
 })(); 

@@ -24,9 +24,13 @@
       "matches": [
         "https://*.visualstudio.com/*/_queries*",
         "https://dev.azure.com/*/_queries*"
-      ],      "js": [
+      ],
+      "js": [
         "shared/api-client.js",
+        "shared/metadata-client.js",
+        "shared/openai-client.js",
         "shared/nl-processor.js",
+        "shared/enhanced-nl-processor.js",
         "shared/url-generator.js",
         "content/query-executor.js",
         "content/ui-injector.js",

@@ -1,329 +1,425 @@
 /**
- * ADO Naturale - Popup JavaScript
- * Handles popup interface functionality and communication with background script
+ * ADO Naturale - Popup Script
+ * Handles extension popup interface and configuration
  */
 
 (function() {
   'use strict';
   
   // DOM elements
-  let extensionStatusEl;
-  let pageStatusEl;
-  let toggleButton;
-  let toggleText;
-  let refreshButton;
-  let totalQueriesEl;
-  let successRateEl;
-  let viewHistoryLink;
-  let reportIssueLink;
+  let elements = {};
   
-  // State
-  let extensionEnabled = true;
-  let currentTab = null;
+  // Initialize popup when DOM is loaded
+  document.addEventListener('DOMContentLoaded', initializePopup);
   
   /**
-   * Initialize popup when DOM is loaded
+   * Initialize the popup interface
    */
-  document.addEventListener('DOMContentLoaded', async () => {
-    console.log('ADO Naturale popup initializing...');
+  async function initializePopup() {
+    console.log('ADO Naturale Popup: Initializing...');
     
-    // Get DOM elements
-    initializeElements();
+    // Get DOM element references
+    getElementReferences();
     
-    // Set up event listeners
-    setupEventListeners();
+    // Attach event listeners
+    attachEventListeners();
     
-    // Load initial state
-    await loadInitialState();
+    // Load current settings and status
+    await loadCurrentState();
     
-    console.log('ADO Naturale popup initialized');
-  });
+    console.log('ADO Naturale Popup: Initialized successfully');
+  }
   
   /**
    * Get references to DOM elements
    */
-  function initializeElements() {
-    extensionStatusEl = document.getElementById('extensionStatus');
-    pageStatusEl = document.getElementById('pageStatus');
-    toggleButton = document.getElementById('toggleExtension');
-    toggleText = document.getElementById('toggleText');
-    refreshButton = document.getElementById('refreshExtension');
-    totalQueriesEl = document.getElementById('totalQueries');
-    successRateEl = document.getElementById('successRate');
-    viewHistoryLink = document.getElementById('viewHistory');
-    reportIssueLink = document.getElementById('reportIssue');
+  function getElementReferences() {
+    elements = {
+      // Status elements
+      extensionStatus: document.getElementById('extension-status'),
+      metadataStatus: document.getElementById('metadata-status'),
+      openaiStatus: document.getElementById('openai-status'),
+      
+      // Configuration elements
+      openaiEndpoint: document.getElementById('openai-endpoint'),
+      openaiKey: document.getElementById('openai-key'),
+      openaiDeployment: document.getElementById('openai-deployment'),
+      saveConfigBtn: document.getElementById('save-config'),
+      testConnectionBtn: document.getElementById('test-connection'),
+      
+      // Settings elements
+      extensionEnabled: document.getElementById('extension-enabled'),
+      showFeedback: document.getElementById('show-feedback'),
+      
+      // Metadata elements
+      metadataInfo: document.getElementById('metadata-info'),
+      refreshMetadataBtn: document.getElementById('refresh-metadata'),
+      
+      // Stats elements
+      queriesCount: document.getElementById('queries-count'),
+      successRate: document.getElementById('success-rate'),
+      
+      // Other elements
+      viewLogsBtn: document.getElementById('view-logs')
+    };
   }
   
   /**
-   * Set up event listeners
+   * Attach event listeners
    */
-  function setupEventListeners() {
-    // Toggle extension
-    toggleButton.addEventListener('click', handleToggleExtension);
+  function attachEventListeners() {
+    // Configuration buttons
+    elements.saveConfigBtn.addEventListener('click', saveOpenAIConfiguration);
+    elements.testConnectionBtn.addEventListener('click', testOpenAIConnection);
     
-    // Refresh extension
-    refreshButton.addEventListener('click', handleRefreshExtension);
+    // Settings toggles
+    elements.extensionEnabled.addEventListener('change', toggleExtension);
+    elements.showFeedback.addEventListener('change', toggleFeedback);
     
-    // View history
-    viewHistoryLink.addEventListener('click', handleViewHistory);
+    // Metadata refresh
+    elements.refreshMetadataBtn.addEventListener('click', refreshMetadata);
     
-    // Report issue
-    reportIssueLink.addEventListener('click', handleReportIssue);
+    // View logs
+    elements.viewLogsBtn.addEventListener('click', viewLogs);
   }
   
   /**
-   * Load initial state from storage and current tab
+   * Load current state and settings
    */
-  async function loadInitialState() {
+  async function loadCurrentState() {
     try {
-      // Get current tab
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      currentTab = tabs[0];
+      // Load extension settings
+      const settings = await getStorageData(['extensionEnabled', 'showFeedback', 'openaiConfig']);
       
-      // Update page status
-      updatePageStatus();
+      // Update UI with current settings
+      elements.extensionEnabled.checked = settings.extensionEnabled !== false;
+      elements.showFeedback.checked = settings.showFeedback !== false;
       
-      // Get extension settings
-      const settings = await getExtensionSettings();
-      extensionEnabled = settings.enabled !== false;
+      // Load OpenAI configuration
+      if (settings.openaiConfig) {
+        elements.openaiEndpoint.value = settings.openaiConfig.endpoint || '';
+        elements.openaiKey.value = settings.openaiConfig.apiKey || '';
+        elements.openaiDeployment.value = settings.openaiConfig.deploymentName || 'gpt-4';
+      }
       
-      // Update extension status
-      updateExtensionStatus();
+      // Update status indicators
+      await updateStatusIndicators();
       
       // Load usage statistics
-      await loadUsageStats();
+      await loadUsageStatistics();
+      
+      // Load metadata information
+      await loadMetadataInformation();
       
     } catch (error) {
-      console.error('Error loading initial state:', error);
-      showError('Failed to load extension state');
+      console.error('ADO Naturale Popup: Error loading current state:', error);
+      showError('Failed to load current settings');
     }
   }
   
   /**
-   * Update page status display
+   * Update status indicators
    */
-  function updatePageStatus() {
-    if (!currentTab) {
-      pageStatusEl.textContent = 'Unknown';
-      pageStatusEl.className = 'status-value';
-      return;
-    }
+  async function updateStatusIndicators() {
+    // Extension status
+    const extensionEnabled = elements.extensionEnabled.checked;
+    updateStatusElement(elements.extensionStatus, extensionEnabled ? 'Active' : 'Disabled', extensionEnabled);
     
-    const url = currentTab.url;
-    const isADOPage = url.includes('visualstudio.com') || url.includes('dev.azure.com');
-    const isQueryPage = url.includes('/_queries');
+    // OpenAI status
+    const hasOpenAIConfig = elements.openaiEndpoint.value && elements.openaiKey.value;
+    updateStatusElement(elements.openaiStatus, hasOpenAIConfig ? 'Configured' : 'Not Configured', hasOpenAIConfig);
     
-    if (isADOPage && isQueryPage) {
-      pageStatusEl.textContent = 'ADO Queries';
-      pageStatusEl.className = 'status-value ado-page';
-    } else if (isADOPage) {
-      pageStatusEl.textContent = 'Azure DevOps';
-      pageStatusEl.className = 'status-value ado-page';
-    } else {
-      pageStatusEl.textContent = 'Other Page';
-      pageStatusEl.className = 'status-value other-page';
+    // Metadata status - check with content script
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0] && isADOPage(tabs[0].url)) {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, { action: 'getMetadataStatus' });
+        if (response && response.success) {
+          updateStatusElement(elements.metadataStatus, 'Loaded', true);
+        } else {
+          updateStatusElement(elements.metadataStatus, 'Not Available', false);
+        }
+      } else {
+        updateStatusElement(elements.metadataStatus, 'Not on ADO Page', false);
+      }
+    } catch (error) {
+      updateStatusElement(elements.metadataStatus, 'Unknown', false);
     }
   }
   
   /**
-   * Update extension status display
+   * Update a status element
    */
-  function updateExtensionStatus() {
-    if (extensionEnabled) {
-      extensionStatusEl.textContent = 'Enabled';
-      extensionStatusEl.className = 'status-value enabled';
-      toggleText.textContent = 'Disable Extension';
-      toggleButton.className = 'control-button primary';
-    } else {
-      extensionStatusEl.textContent = 'Disabled';
-      extensionStatusEl.className = 'status-value disabled';
-      toggleText.textContent = 'Enable Extension';
-      toggleButton.className = 'control-button primary disabled';
+  function updateStatusElement(element, text, isPositive) {
+    element.textContent = text;
+    element.className = `status-value ${isPositive ? 'status-positive' : 'status-negative'}`;
+  }
+  
+  /**
+   * Save OpenAI configuration
+   */
+  async function saveOpenAIConfiguration() {
+    try {
+      const config = {
+        endpoint: elements.openaiEndpoint.value.trim(),
+        apiKey: elements.openaiKey.value.trim(),
+        deploymentName: elements.openaiDeployment.value.trim() || 'gpt-4'
+      };
+      
+      if (!config.endpoint || !config.apiKey) {
+        showError('Please provide both endpoint URL and API key');
+        return;
+      }
+      
+      // Validate endpoint URL
+      try {
+        new URL(config.endpoint);
+      } catch {
+        showError('Please provide a valid endpoint URL');
+        return;
+      }
+      
+      // Save configuration
+      await setStorageData({ openaiConfig: config });
+      
+      // Update status
+      await updateStatusIndicators();
+      
+      showSuccess('OpenAI configuration saved successfully');
+      
+    } catch (error) {
+      console.error('ADO Naturale Popup: Error saving OpenAI config:', error);
+      showError('Failed to save configuration');
+    }
+  }
+  
+  /**
+   * Test OpenAI connection
+   */
+  async function testOpenAIConnection() {
+    try {
+      elements.testConnectionBtn.disabled = true;
+      elements.testConnectionBtn.textContent = 'Testing...';
+      
+      const config = {
+        endpoint: elements.openaiEndpoint.value.trim(),
+        apiKey: elements.openaiKey.value.trim(),
+        deploymentName: elements.openaiDeployment.value.trim() || 'gpt-4'
+      };
+      
+      if (!config.endpoint || !config.apiKey) {
+        showError('Please provide both endpoint URL and API key');
+        return;
+      }
+      
+      // Send test request to content script
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0] && isADOPage(tabs[0].url)) {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, { 
+          action: 'testOpenAIConnection',
+          config: config
+        });
+        
+        if (response && response.success) {
+          showSuccess('OpenAI connection test successful');
+        } else {
+          showError(response?.error || 'Connection test failed');
+        }
+      } else {
+        showError('Please navigate to an Azure DevOps page to test the connection');
+      }
+      
+    } catch (error) {
+      console.error('ADO Naturale Popup: Error testing OpenAI connection:', error);
+      showError('Connection test failed');
+    } finally {
+      elements.testConnectionBtn.disabled = false;
+      elements.testConnectionBtn.textContent = 'Test Connection';
+    }
+  }
+  
+  /**
+   * Toggle extension enabled/disabled
+   */
+  async function toggleExtension() {
+    try {
+      const enabled = elements.extensionEnabled.checked;
+      await setStorageData({ extensionEnabled: enabled });
+      await updateStatusIndicators();
+      
+      showSuccess(`Extension ${enabled ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error('ADO Naturale Popup: Error toggling extension:', error);
+      showError('Failed to update extension setting');
+    }
+  }
+  
+  /**
+   * Toggle feedback display
+   */
+  async function toggleFeedback() {
+    try {
+      const showFeedback = elements.showFeedback.checked;
+      await setStorageData({ showFeedback: showFeedback });
+      
+      showSuccess(`Feedback display ${showFeedback ? 'enabled' : 'disabled'}`);
+    } catch (error) {
+      console.error('ADO Naturale Popup: Error toggling feedback:', error);
+      showError('Failed to update feedback setting');
+    }
+  }
+  
+  /**
+   * Refresh metadata
+   */
+  async function refreshMetadata() {
+    try {
+      elements.refreshMetadataBtn.disabled = true;
+      elements.refreshMetadataBtn.textContent = 'Refreshing...';
+      
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0] && isADOPage(tabs[0].url)) {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, { action: 'refreshMetadata' });
+        
+        if (response && response.success) {
+          await loadMetadataInformation();
+          await updateStatusIndicators();
+          showSuccess('Metadata refreshed successfully');
+        } else {
+          showError(response?.error || 'Failed to refresh metadata');
+        }
+      } else {
+        showError('Please navigate to an Azure DevOps page to refresh metadata');
+      }
+      
+    } catch (error) {
+      console.error('ADO Naturale Popup: Error refreshing metadata:', error);
+      showError('Failed to refresh metadata');
+    } finally {
+      elements.refreshMetadataBtn.disabled = false;
+      elements.refreshMetadataBtn.textContent = 'Refresh Metadata';
+    }
+  }
+  
+  /**
+   * Load metadata information
+   */
+  async function loadMetadataInformation() {
+    try {
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (tabs[0] && isADOPage(tabs[0].url)) {
+        const response = await chrome.tabs.sendMessage(tabs[0].id, { action: 'getMetadataInfo' });
+        
+        if (response && response.success && response.metadata) {
+          const metadata = response.metadata;
+          const html = `
+            <div class="metadata-details">
+              <div class="metadata-item">
+                <strong>Organization:</strong> ${metadata.organization || 'Unknown'}
+              </div>
+              <div class="metadata-item">
+                <strong>Project:</strong> ${metadata.project || 'Unknown'}
+              </div>
+              <div class="metadata-item">
+                <strong>Work Item Types:</strong> ${Object.keys(metadata.workItemTypes || {}).length}
+              </div>
+              <div class="metadata-item">
+                <strong>Fields:</strong> ${Object.keys(metadata.fields || {}).length}
+              </div>
+              <div class="metadata-item">
+                <strong>Team Members:</strong> ${(metadata.teamMembers || []).length}
+              </div>
+              <div class="metadata-item">
+                <strong>Iterations:</strong> ${(metadata.iterations || []).length}
+              </div>
+              ${metadata.isFallback ? '<div class="metadata-warning">⚠️ Using fallback metadata</div>' : ''}
+            </div>
+          `;
+          elements.metadataInfo.innerHTML = html;
+        } else {
+          elements.metadataInfo.innerHTML = '<p class="metadata-error">Metadata not available</p>';
+        }
+      } else {
+        elements.metadataInfo.innerHTML = '<p class="metadata-info">Navigate to an Azure DevOps page to view metadata</p>';
+      }
+    } catch (error) {
+      console.error('ADO Naturale Popup: Error loading metadata info:', error);
+      elements.metadataInfo.innerHTML = '<p class="metadata-error">Error loading metadata</p>';
     }
   }
   
   /**
    * Load usage statistics
    */
-  async function loadUsageStats() {
+  async function loadUsageStatistics() {
     try {
-      const response = await sendMessageToBackground({ action: 'getQueryHistory' });
+      const stats = await getStorageData(['queryHistory', 'usageStats']);
       
-      if (response.success) {
-        const history = response.history || [];
-        const totalQueries = history.length;
-        
-        // Calculate success rate (assuming queries without errors are successful)
-        const successfulQueries = history.filter(query => !query.error).length;
-        const successRate = totalQueries > 0 ? Math.round((successfulQueries / totalQueries) * 100) : 0;
-        
-        totalQueriesEl.textContent = totalQueries;
-        successRateEl.textContent = `${successRate}%`;
-      }
+      const queryHistory = stats.queryHistory || [];
+      const usageStats = stats.usageStats || { totalQueries: 0, successfulQueries: 0 };
+      
+      elements.queriesCount.textContent = usageStats.totalQueries || queryHistory.length || 0;
+      
+      const successRate = usageStats.totalQueries > 0 
+        ? Math.round((usageStats.successfulQueries / usageStats.totalQueries) * 100)
+        : 0;
+      elements.successRate.textContent = `${successRate}%`;
+      
     } catch (error) {
-      console.error('Error loading usage stats:', error);
-      totalQueriesEl.textContent = '0';
-      successRateEl.textContent = '0%';
+      console.error('ADO Naturale Popup: Error loading usage statistics:', error);
+      elements.queriesCount.textContent = '-';
+      elements.successRate.textContent = '-';
     }
   }
   
   /**
-   * Handle toggle extension button click
+   * View logs
    */
-  async function handleToggleExtension() {
-    try {
-      toggleButton.classList.add('loading');
-      
-      const newState = !extensionEnabled;
-      
-      // Send toggle message to background
-      const response = await sendMessageToBackground({
-        action: 'toggleExtension',
-        enabled: newState
-      });
-      
-      if (response.success) {
-        extensionEnabled = newState;
-        updateExtensionStatus();
-        
-        // If we're on an ADO page, also send message to content script
-        if (currentTab && (currentTab.url.includes('visualstudio.com') || currentTab.url.includes('dev.azure.com'))) {
-          try {
-            await chrome.tabs.sendMessage(currentTab.id, {
-              action: 'toggleExtension',
-              enabled: newState
-            });
-          } catch (error) {
-            console.warn('Could not send message to content script:', error);
-          }
-        }
-      } else {
-        showError('Failed to toggle extension');
-      }
-    } catch (error) {
-      console.error('Error toggling extension:', error);
-      showError('Failed to toggle extension');
-    } finally {
-      toggleButton.classList.remove('loading');
-    }
+  function viewLogs() {
+    // Open browser console or extension logs
+    chrome.tabs.create({ url: 'chrome://extensions/?id=' + chrome.runtime.id });
   }
   
   /**
-   * Handle refresh extension button click
+   * Utility functions
    */
-  async function handleRefreshExtension() {
-    try {
-      refreshButton.classList.add('loading');
-      
-      // If we're on an ADO page, send reinitialize message
-      if (currentTab && (currentTab.url.includes('visualstudio.com') || currentTab.url.includes('dev.azure.com'))) {
-        try {
-          await chrome.tabs.sendMessage(currentTab.id, {
-            action: 'reinitialize'
-          });
-          
-          // Reload stats
-          await loadUsageStats();
-          
-        } catch (error) {
-          console.warn('Could not send message to content script:', error);
-          showError('Please refresh the page manually');
-        }
-      } else {
-        showError('Not on an Azure DevOps page');
-      }
-    } catch (error) {
-      console.error('Error refreshing extension:', error);
-      showError('Failed to refresh extension');
-    } finally {
-      refreshButton.classList.remove('loading');
-    }
+  function isADOPage(url) {
+    return url && (url.includes('dev.azure.com') || url.includes('.visualstudio.com'));
   }
   
-  /**
-   * Handle view history link click
-   */
-  function handleViewHistory(e) {
-    e.preventDefault();
-    
-    // For now, just show an alert. In the future, this could open a dedicated history page
-    alert('Query history feature coming soon!\n\nYou can view your recent queries in the browser console for now.');
-  }
-  
-  /**
-   * Handle report issue link click
-   */
-  function handleReportIssue(e) {
-    e.preventDefault();
-    
-    // Open GitHub issues page or internal feedback system
-    const issueUrl = 'https://github.com/your-org/ado-naturale/issues/new';
-    chrome.tabs.create({ url: issueUrl });
-  }
-  
-  /**
-   * Get extension settings from storage
-   */
-  async function getExtensionSettings() {
+  function getStorageData(keys) {
     return new Promise((resolve) => {
-      chrome.storage.sync.get(['enabled', 'settings'], (result) => {
-        if (chrome.runtime.lastError) {
-          console.warn('Could not get extension settings:', chrome.runtime.lastError);
-          resolve({ enabled: true });
-        } else {
-          resolve({
-            enabled: result.enabled !== false,
-            settings: result.settings || {}
-          });
-        }
-      });
+      chrome.storage.sync.get(keys, resolve);
     });
   }
   
-  /**
-   * Send message to background script
-   */
-  function sendMessageToBackground(message) {
+  function setStorageData(data) {
     return new Promise((resolve) => {
-      chrome.runtime.sendMessage(message, (response) => {
-        if (chrome.runtime.lastError) {
-          resolve({ success: false, error: chrome.runtime.lastError.message });
-        } else {
-          resolve(response || { success: false, error: 'No response' });
-        }
-      });
+      chrome.storage.sync.set(data, resolve);
     });
   }
   
-  /**
-   * Show error message
-   */
+  function showSuccess(message) {
+    showNotification(message, 'success');
+  }
+  
   function showError(message) {
-    // For now, just log to console. In the future, could show in UI
-    console.error('Popup error:', message);
+    showNotification(message, 'error');
+  }
+  
+  function showNotification(message, type) {
+    // Create notification element
+    const notification = document.createElement('div');
+    notification.className = `notification notification-${type}`;
+    notification.textContent = message;
     
-    // Could add a toast notification or error banner here
-    const errorEl = document.createElement('div');
-    errorEl.textContent = message;
-    errorEl.style.cssText = `
-      position: fixed;
-      top: 10px;
-      left: 10px;
-      right: 10px;
-      background: #ffebe9;
-      color: #cf222e;
-      padding: 8px 12px;
-      border-radius: 6px;
-      border: 1px solid #fd8c73;
-      font-size: 12px;
-      z-index: 1000;
-    `;
+    // Add to popup
+    document.body.appendChild(notification);
     
-    document.body.appendChild(errorEl);
-    
+    // Auto-remove after 3 seconds
     setTimeout(() => {
-      if (errorEl.parentNode) {
-        errorEl.parentNode.removeChild(errorEl);
+      if (notification.parentNode) {
+        notification.parentNode.removeChild(notification);
       }
     }, 3000);
   }

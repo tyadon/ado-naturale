@@ -423,4 +423,64 @@
   .loading-spinner {
     animation: none;
   }
+}
+
+/* Feedback display */
+.ado-naturale-feedback {
+  margin: 8px 0;
+  border-radius: 6px;
+  overflow: hidden;
+  animation: slideDown 0.3s ease-out;
+}
+
+.success-feedback {
+  background: #f3f9ff;
+  border: 1px solid #0078d4;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.feedback-header {
+  display: flex;
+  align-items: center;
+  padding: 8px 12px;
+  background: #0078d4;
+  color: white;
+  font-weight: 500;
+  font-size: 13px;
+}
+
+.success-icon {
+  margin-right: 8px;
+  font-size: 14px;
+}
+
+.feedback-details {
+  padding: 12px;
+}
+
+.feedback-item {
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: #323130;
+}
+
+.feedback-item:last-child {
+  margin-bottom: 0;
+}
+
+.feedback-item strong {
+  color: #0078d4;
+  font-weight: 600;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 } 

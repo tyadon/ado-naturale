@@ -8,70 +8,124 @@
 </head>
 <body>
   <div class="popup-container">
-    <header class="popup-header">
-      <div class="logo">
-        <span class="logo-icon">🧠</span>
-        <h1 class="logo-text">ADO Naturale</h1>
-      </div>
-      <div class="version">v1.0.0</div>
-    </header>
+    <div class="popup-header">
+      <h1>🧠 ADO Naturale</h1>
+      <p class="subtitle">Natural Language Query for Azure DevOps</p>
+    </div>
     
-    <main class="popup-content">
-      <div class="status-section">
-        <div class="status-item">
-          <span class="status-label">Status:</span>
-          <span class="status-value" id="extensionStatus">Checking...</span>
-        </div>
-        <div class="status-item">
-          <span class="status-label">Page:</span>
-          <span class="status-value" id="pageStatus">Unknown</span>
-        </div>
-      </div>
-      
-      <div class="controls-section">
-        <button id="toggleExtension" class="control-button primary">
-          <span id="toggleText">Disable Extension</span>
-        </button>
-        
-        <button id="refreshExtension" class="control-button secondary">
-          <span>Refresh Interface</span>
-        </button>
-      </div>
-      
-      <div class="info-section">
-        <h3>Quick Help</h3>
-        <div class="help-content">
-          <p>Use natural language to query Azure DevOps:</p>
-          <ul>
-            <li>"Show me my bugs"</li>
-            <li>"High priority user stories"</li>
-            <li>"Tasks created this week"</li>
-            <li>"Items assigned to me"</li>
-          </ul>
+    <div class="popup-content">
+      <!-- Status Section -->
+      <div class="section">
+        <h3>Status</h3>
+        <div class="status-grid">
+          <div class="status-item">
+            <span class="status-label">Extension:</span>
+            <span id="extension-status" class="status-value">Loading...</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Metadata:</span>
+            <span id="metadata-status" class="status-value">Loading...</span>
+          </div>
+          <div class="status-item">
+            <span class="status-label">Azure OpenAI:</span>
+            <span id="openai-status" class="status-value">Loading...</span>
+          </div>
         </div>
       </div>
       
-      <div class="stats-section">
-        <h3>Usage Stats</h3>
-        <div class="stats-grid">
+      <!-- Azure OpenAI Configuration -->
+      <div class="section">
+        <h3>Azure OpenAI Configuration</h3>
+        <div class="config-form">
+          <div class="form-group">
+            <label for="openai-endpoint">Endpoint URL:</label>
+            <input type="text" id="openai-endpoint" placeholder="https://your-resource.openai.azure.com">
+          </div>
+          <div class="form-group">
+            <label for="openai-key">API Key:</label>
+            <input type="password" id="openai-key" placeholder="Your Azure OpenAI API key">
+          </div>
+          <div class="form-group">
+            <label for="openai-deployment">Deployment Name:</label>
+            <input type="text" id="openai-deployment" placeholder="gpt-4" value="gpt-4">
+          </div>
+          <div class="form-actions">
+            <button id="save-config" class="btn btn-primary">Save Configuration</button>
+            <button id="test-connection" class="btn btn-secondary">Test Connection</button>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Extension Settings -->
+      <div class="section">
+        <h3>Settings</h3>
+        <div class="settings-grid">
+          <div class="setting-item">
+            <label class="toggle-label">
+              <input type="checkbox" id="extension-enabled" checked>
+              <span class="toggle-slider"></span>
+              Enable Extension
+            </label>
+          </div>
+          <div class="setting-item">
+            <label class="toggle-label">
+              <input type="checkbox" id="show-feedback" checked>
+              <span class="toggle-slider"></span>
+              Show Processing Feedback
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Metadata Information -->
+      <div class="section">
+        <h3>Project Metadata</h3>
+        <div id="metadata-info" class="metadata-info">
+          <p>Loading project information...</p>
+        </div>
+        <button id="refresh-metadata" class="btn btn-secondary">Refresh Metadata</button>
+      </div>
+      
+      <!-- Usage Statistics -->
+      <div class="section">
+        <h3>Usage Statistics</h3>
+        <div id="usage-stats" class="stats-grid">
           <div class="stat-item">
-            <span class="stat-number" id="totalQueries">0</span>
-            <span class="stat-label">Total Queries</span>
+            <span class="stat-value" id="queries-count">-</span>
+            <span class="stat-label">Queries Processed</span>
           </div>
           <div class="stat-item">
-            <span class="stat-number" id="successRate">0%</span>
+            <span class="stat-value" id="success-rate">-</span>
             <span class="stat-label">Success Rate</span>
           </div>
         </div>
       </div>
-    </main>
-    
-    <footer class="popup-footer">
-      <div class="footer-links">
-        <a href="#" id="viewHistory" class="footer-link">View History</a>
-        <a href="#" id="reportIssue" class="footer-link">Report Issue</a>
+      
+      <!-- Help Section -->
+      <div class="section">
+        <h3>Quick Help</h3>
+        <div class="help-content">
+          <h4>Example Queries:</h4>
+          <ul class="example-list">
+            <li>"Show me my bugs"</li>
+            <li>"High priority user stories assigned to me"</li>
+            <li>"Items created this week"</li>
+            <li>"Tasks in current sprint"</li>
+            <li>"Resolved bugs from last month"</li>
+          </ul>
+          <p class="help-note">
+            With Azure OpenAI configured, you can use more complex and natural language queries.
+          </p>
+        </div>
       </div>
-    </footer>
+    </div>
+    
+    <div class="popup-footer">
+      <div class="version-info">
+        <span>Version 1.0.0</span>
+        <a href="#" id="view-logs">View Logs</a>
+      </div>
+    </div>
   </div>
   
   <script src="popup.js"></script>
