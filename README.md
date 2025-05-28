@@ -1,17 +1,17 @@
 # ADO Naturale - Azure DevOps Natural Language Query Extension
 
-🧠 **Query Azure DevOps using natural language - converts your questions into WIQL queries**
+🧠 **Query Azure DevOps using natural language - converts your questions into Azure DevOps queries**
 
 ## Overview
 
-ADO Naturale is a Microsoft Edge extension that integrates seamlessly into Azure DevOps query pages, allowing you to write queries in plain English instead of learning WIQL (Work Item Query Language) syntax.
+ADO Naturale is a Microsoft Edge extension that integrates seamlessly into Azure DevOps, allowing you to write queries in plain English instead of learning complex query syntax. The extension processes your natural language input and navigates to appropriate Azure DevOps query URLs.
 
 ### Key Features
 
 - **Natural Language Processing**: Write queries like "Show me my bugs" or "High priority user stories assigned to me"
-- **Seamless Integration**: Injects directly into Azure DevOps query interface
-- **WIQL Generation**: Automatically converts natural language to valid WIQL
-- **Query Execution**: Executes queries directly in the existing ADO interface
+- **Seamless Integration**: Positions at the bottom of the screen with minimizable interface
+- **URL Generation**: Automatically converts natural language to valid Azure DevOps query URLs
+- **Query Execution**: Navigates to appropriate query results using ADO's native URL structure
 - **Query History**: Keeps track of your recent queries
 - **Smart Suggestions**: Provides quick examples and templates
 
@@ -41,9 +41,9 @@ ADO Naturale is a Microsoft Edge extension that integrates seamlessly into Azure
 
 ### Basic Usage
 
-1. Navigate to any Azure DevOps query page (`https://*.visualstudio.com/*/_queries` or `https://dev.azure.com/*/_queries`)
+1. Navigate to any Azure DevOps page (`https://*.visualstudio.com/*` or `https://dev.azure.com/*`)
 
-2. You'll see a new "Natural Language Query" interface at the top of the page
+2. You'll see a new "Natural Language Query" interface at the bottom of the page (can be minimized when not in use)
 
 3. Type your query in plain English, for example:
    - "Show me my bugs"
@@ -53,7 +53,7 @@ ADO Naturale is a Microsoft Edge extension that integrates seamlessly into Azure
 
 4. Click the "Query" button or press Ctrl+Enter
 
-5. The extension will generate WIQL and execute it in the ADO interface
+5. The extension will generate a query URL and navigate to the results page
 
 ### Supported Query Types
 
@@ -105,7 +105,7 @@ ado-naturale/
 ├── content/
 │   ├── content-script.js      # Main content script
 │   ├── ui-injector.js         # UI component injection
-│   └── query-executor.js      # WIQL execution logic
+│   └── query-executor.js      # Query execution logic
 ├── popup/
 │   ├── popup.html            # Extension popup
 │   ├── popup.js              # Popup logic
@@ -113,19 +113,17 @@ ado-naturale/
 ├── shared/
 │   ├── api-client.js         # ADO API interaction
 │   ├── nl-processor.js       # Natural language processing
-│   └── wiql-generator.js     # WIQL query generation
-├── styles/
-│   └── content.css           # Injected styles
-└── assets/
-    └── icons/                # Extension icons
+│   └── url-generator.js      # URL query generation
+└── styles/
+    └── content.css           # Injected styles
 ```
 
 ### Core Components
 
 1. **Natural Language Processor**: Parses user input and extracts intent, entities, and filters
-2. **WIQL Generator**: Converts processed natural language into valid WIQL syntax
-3. **Query Executor**: Injects WIQL into ADO interface and triggers execution
-4. **UI Injector**: Seamlessly integrates the interface into ADO pages
+2. **URL Generator**: Converts processed natural language into valid Azure DevOps query URLs
+3. **Query Executor**: Navigates to the generated URL to display query results
+4. **UI Injector**: Positions the interface at the bottom of the screen with minimize/maximize capability
 
 ## Development
 

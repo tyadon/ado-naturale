@@ -15,7 +15,6 @@
     "https://dev.azure.com/*",
     "https://*.azure.com/*"
   ],
-  
   "background": {
     "service_worker": "background/service-worker.js"
   },
@@ -25,11 +24,10 @@
       "matches": [
         "https://*.visualstudio.com/*/_queries*",
         "https://dev.azure.com/*/_queries*"
-      ],
-      "js": [
+      ],      "js": [
         "shared/api-client.js",
         "shared/nl-processor.js",
-        "shared/wiql-generator.js",
+        "shared/url-generator.js",
         "content/query-executor.js",
         "content/ui-injector.js",
         "content/content-script.js"
@@ -43,27 +41,13 @@
   
   "action": {
     "default_popup": "popup/popup.html",
-    "default_title": "ADO Naturale",
-    "default_icon": {
-      "16": "assets/icons/icon16.png",
-      "32": "assets/icons/icon32.png",
-      "48": "assets/icons/icon48.png",
-      "128": "assets/icons/icon128.png"
-    }
-  },
-  
-  "icons": {
-    "16": "assets/icons/icon16.png",
-    "32": "assets/icons/icon32.png",
-    "48": "assets/icons/icon48.png",
-    "128": "assets/icons/icon128.png"
+    "default_title": "ADO Naturale"
   },
   
   "web_accessible_resources": [
     {
       "resources": [
-        "styles/content.css",
-        "assets/icons/*"
+        "styles/content.css"
       ],
       "matches": [
         "https://*.visualstudio.com/*",
@@ -71,4 +55,4 @@
       ]
     }
   ]
-} 
+}

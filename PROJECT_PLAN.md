@@ -1,14 +1,14 @@
 # Azure DevOps Natural Language Query Extension - Project Plan
 
 ## Project Overview
-A Microsoft Edge extension that integrates into Azure DevOps query pages to allow natural language querying by converting user input to WIQL (Work Item Query Language) and executing the queries within the existing ADO interface.
+A Microsoft Edge extension that integrates into Azure DevOps to allow natural language querying by converting user input to query URLs and navigating to the results within the Azure DevOps interface.
 
 ## Core Requirements
 - **Target Platform**: Microsoft Edge Extension (Manifest V3)
-- **Integration Point**: Azure DevOps query pages (`https://microsoft.visualstudio.com/*/queries`)
+- **Integration Point**: All Azure DevOps pages (`https://microsoft.visualstudio.com/*` and `https://dev.azure.com/*`)
 - **Authentication**: Use existing ADO session/cookies
-- **Functionality**: Convert natural language → WIQL → Execute query
-- **UI Integration**: Seamlessly integrate into existing ADO interface
+- **Functionality**: Convert natural language → Query URL → Navigate to results
+- **UI Integration**: Minimizable interface positioned at the bottom of the screen
 
 ## Technical Architecture
 
@@ -21,7 +21,7 @@ ado-naturale/
 ├── content/
 │   ├── content-script.js      # Main content script for ADO pages
 │   ├── ui-injector.js         # UI component injection
-│   └── query-executor.js      # WIQL execution logic
+│   └── query-executor.js      # Query execution logic
 ├── popup/
 │   ├── popup.html            # Extension popup (optional)
 │   ├── popup.js              # Popup logic
@@ -29,11 +29,9 @@ ado-naturale/
 ├── shared/
 │   ├── api-client.js         # ADO API interaction
 │   ├── nl-processor.js       # Natural language processing
-│   └── wiql-generator.js     # WIQL query generation
-├── styles/
-│   └── content.css           # Injected styles
-└── assets/
-    └── icons/                # Extension icons
+│   └── url-generator.js      # URL query generation
+└── styles/
+    └── content.css           # Injected styles
 ```
 
 ### 2. Core Components
@@ -44,19 +42,20 @@ ado-naturale/
 - **Output**: Structured query parameters
 - **Technology**: Azure OpenAI Service (since you're at Microsoft)
 
-#### B. WIQL Generator
+#### B. URL Generator
 - **Input**: Structured query parameters
-- **Processing**: Generate valid WIQL syntax
-- **Output**: Executable WIQL query string
-- **Features**: Support for complex queries, joins, date ranges, etc.
+- **Processing**: Generate valid Azure DevOps query URLs
+- **Output**: Navigable URL string
+- **Features**: Support for complex queries, dates ranges, etc.
 
 #### C. ADO Integration Layer
-- **Query Execution**: Inject WIQL into existing query editor
-- **Result Handling**: Let ADO handle result display
+- **Navigation**: Use URL-based approach to show query results
+- **Result Handling**: Let ADO handle result display via its native URL structure
 - **Session Management**: Leverage existing authentication
 
 #### D. UI Components
-- **Query Input Box**: Natural language input field
+- **Query Input Box**: Natural language input field positioned at bottom of screen
+- **Minimize/Maximize**: Toggle between collapsed and expanded states
 - **Quick Actions**: Common query templates
 - **History**: Recent queries and favorites
 
@@ -116,37 +115,28 @@ ado-naturale/
 
 ### 1. Content Script Integration
 ```javascript
-// Detect ADO query pages
-if (window.location.href.includes('/_queries')) {
+// Detect any ADO pages
+if (window.location.href.includes('visualstudio.com') || window.location.href.includes('dev.azure.com')) {
     injectNaturalLanguageInterface();
 }
 ```
 
-### 2. WIQL Generation Strategy
+### 2. URL Generation Strategy
 - **Entity Recognition**: Users, dates, work item types, fields
 - **Intent Classification**: Search, filter, sort, group
 - **Context Integration**: Current project, iteration, team
-- **Query Building**: Construct valid WIQL syntax
+- **Query Building**: Construct valid ADO query URLs
 
 ### 3. Common Query Patterns
-```sql
+```
 -- "Show me my bugs"
-SELECT [System.Id], [System.Title], [System.State] 
-FROM WorkItems 
-WHERE [System.WorkItemType] = 'Bug' 
-AND [System.AssignedTo] = @Me
+https://dev.azure.com/{org}/{project}/_queries/query/?wiql=SELECT%20*%20FROM%20WorkItems%20WHERE%20[System.WorkItemType]%20=%20'Bug'%20AND%20[System.AssignedTo]%20=%20@Me
 
 -- "Items created last week"
-SELECT [System.Id], [System.Title], [System.CreatedDate]
-FROM WorkItems 
-WHERE [System.CreatedDate] >= @Today - 7
+https://dev.azure.com/{org}/{project}/_queries/query/?wiql=SELECT%20*%20FROM%20WorkItems%20WHERE%20[System.CreatedDate]%20>=%20@Today-7
 
 -- "High priority user stories in current iteration"
-SELECT [System.Id], [System.Title], [System.Priority]
-FROM WorkItems 
-WHERE [System.WorkItemType] = 'User Story'
-AND [System.Priority] <= 2
-AND [System.IterationPath] = @CurrentIteration
+https://dev.azure.com/{org}/{project}/_queries/query/?wiql=SELECT%20*%20FROM%20WorkItems%20WHERE%20[System.WorkItemType]%20=%20'User%20Story'%20AND%20[System.Priority]%20<=%202%20AND%20[System.IterationPath]%20=%20@CurrentIteration
 ```
 
 ## Development Phases

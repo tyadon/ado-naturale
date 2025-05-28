@@ -51,31 +51,12 @@
         return false;
       }
     }
-    
-    /**
-     * Find the best location to inject our interface
+      /**
+     * Find the injection point for the interface
      */
     findInjectionPoint() {
-      // Try multiple possible locations in order of preference
-      const selectors = [
-        '.query-editor-container',
-        '.query-toolbar',
-        '.toolbar-container',
-        '.query-view-container',
-        '.hub-content',
-        '.content-container',
-        '[role="main"]'
-      ];
-      
-      for (const selector of selectors) {
-        const element = document.querySelector(selector);
-        if (element) {
-          console.log(`ADO Naturale: Found injection point: ${selector}`);
-          return element;
-        }
-      }
-      
-      // Fallback to body
+      // For bottom-fixed layout, we want to inject directly into the body
+      console.log('ADO Naturale: Using body as injection point for bottom bar');
       return document.body;
     }
     
@@ -134,16 +115,16 @@
       
       injectedElements.push(this.nlInputContainer);
     }
-    
-    /**
+      /**
      * Inject the interface at the specified location
      */
     injectAtLocation(targetElement) {
-      // Insert at the beginning of the target element
-      if (targetElement.firstChild) {
-        targetElement.insertBefore(this.nlInputContainer, targetElement.firstChild);
-      } else {
-        targetElement.appendChild(this.nlInputContainer);
+      // For bottom-fixed layout, always append to the body
+      targetElement.appendChild(this.nlInputContainer);
+      
+      // Initialize in minimized state
+      if (!isInterfaceVisible) {
+        this.nlInputContainer.classList.add('minimized');
       }
     }
     
@@ -198,8 +179,7 @@
       
       try {
         this.showLoading(true);
-        this.hideError();
-        
+        this.hideError();        
         // Send query to background script for processing
         const response = await this.sendMessageToBackground({
           action: 'processNaturalLanguage',
@@ -210,11 +190,11 @@
         });
         
         if (response.success) {
-          // Execute the generated WIQL query
-          await this.executeWIQLQuery(response.wiql);
+          // Execute the generated query URL
+          await this.executeQuery(response.queryUrl);
           
           // Save to history
-          this.saveQueryToHistory(query, response.wiql);
+          this.saveQueryToHistory(query, response.queryUrl);
           
           // Clear input
           this.nlInput.value = '';
@@ -229,20 +209,19 @@
         this.showLoading(false);
       }
     }
-    
-    /**
-     * Execute WIQL query in the ADO interface
+      /**
+     * Execute query by navigating to the generated URL
      */
-    async executeWIQLQuery(wiql) {
+    async executeQuery(queryUrl) {
       try {
-        // Use the query executor to run the WIQL
-        if (typeof window.ADONaturale_QueryExecutor !== 'undefined') {
-          await window.ADONaturale_QueryExecutor.executeQuery(wiql);
+        // Use the query executor to navigate to the URL
+        if (typeof window.ADONaturale !== 'undefined' && window.ADONaturale.QueryExecutor) {
+          await window.ADONaturale.QueryExecutor.executeQuery(queryUrl);
         } else {
           throw new Error('Query executor not available');
         }
       } catch (error) {
-        console.error('ADO Naturale: Error executing WIQL:', error);
+        console.error('ADO Naturale: Error executing query URL:', error);
         throw error;
       }
     }
@@ -261,16 +240,15 @@
         });
       });
     }
-    
-    /**
+      /**
      * Save query to history
      */
-    saveQueryToHistory(naturalLanguage, wiql) {
+    saveQueryToHistory(naturalLanguage, queryUrl) {
       this.sendMessageToBackground({
         action: 'saveQueryHistory',
         data: {
           naturalLanguage,
-          wiql,
+          queryUrl,
           context: currentContext
         }
       });
@@ -299,17 +277,21 @@
     hideError() {
       this.errorDisplay.style.display = 'none';
     }
-    
-    /**
+      /**
      * Toggle interface visibility
      */
     toggleInterface() {
-      const content = this.nlInputContainer.querySelector('.ado-naturale-content');
       const toggleIcon = this.nlInputContainer.querySelector('.toggle-icon');
       
       isInterfaceVisible = !isInterfaceVisible;
-      content.style.display = isInterfaceVisible ? 'block' : 'none';
-      toggleIcon.textContent = isInterfaceVisible ? '−' : '+';
+      
+      if (isInterfaceVisible) {
+        this.nlInputContainer.classList.remove('minimized');
+        toggleIcon.textContent = '−';
+      } else {
+        this.nlInputContainer.classList.add('minimized');
+        toggleIcon.textContent = '+';
+      }
     }
     
     /**

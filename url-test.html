@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ADO Naturale URL Generator Test</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+            line-height: 1.6;
+        }
+        
+        h1 {
+            color: #0078d4;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        
+        .test-container {
+            background-color: #f9f9f9;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: bold;
+        }
+        
+        input, textarea {
+            width: 100%;
+            padding: 8px;
+            margin-bottom: 16px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+        }
+        
+        button {
+            background-color: #0078d4;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        button:hover {
+            background-color: #106ebe;
+        }
+        
+        .result {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+            overflow-wrap: break-word;
+        }
+        
+        .wiql-result {
+            font-family: monospace;
+            margin-top: 10px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 4px;
+            white-space: pre-wrap;
+        }
+        
+        a.test-link {
+            display: inline-block;
+            margin-top: 10px;
+            color: #0078d4;
+            text-decoration: none;
+        }
+        
+        a.test-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <h1>ADO Naturale URL Generator Test</h1>
+    
+    <div class="test-container">
+        <label for="naturalLanguage">Natural Language Query:</label>
+        <textarea id="naturalLanguage" rows="3" placeholder="Enter your natural language query (e.g., 'Show me my bugs')"></textarea>
+        
+        <label for="organization">Organization:</label>
+        <input type="text" id="organization" value="yourorg">
+        
+        <label for="project">Project:</label>
+        <input type="text" id="project" value="yourproject">
+        
+        <button id="generateButton">Generate Query URL</button>
+        
+        <div class="result" id="processedResult" style="display: none;"></div>
+        <div class="wiql-result" id="wiqlResult" style="display: none;"></div>
+        <div id="urlContainer" style="display: none;">
+            <label>Generated URL:</label>
+            <div class="result" id="urlResult"></div>
+            <a href="#" class="test-link" id="testLink" target="_blank">Open Query in New Tab</a>
+        </div>
+    </div>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const generateButton = document.getElementById('generateButton');
+            const naturalLanguageInput = document.getElementById('naturalLanguage');
+            const organizationInput = document.getElementById('organization');
+            const projectInput = document.getElementById('project');
+            const processedResult = document.getElementById('processedResult');
+            const wiqlResult = document.getElementById('wiqlResult');
+            const urlResult = document.getElementById('urlResult');
+            const urlContainer = document.getElementById('urlContainer');
+            const testLink = document.getElementById('testLink');
+            
+            generateButton.addEventListener('click', function() {
+                const query = naturalLanguageInput.value.trim();
+                const organization = organizationInput.value.trim();
+                const project = projectInput.value.trim();
+                
+                if (!query || !organization || !project) {
+                    alert('Please fill in all fields');
+                    return;
+                }
+                
+                // Process the natural language query
+                const processedQuery = processNaturalLanguage(query, { organization, project });
+                
+                // Generate WIQL
+                const wiql = generateWIQL(processedQuery);
+                
+                // Generate URL
+                const url = generateQueryUrl(processedQuery, {
+                    url: `https://dev.azure.com/${organization}/${project}/_queries`,
+                    organization,
+                    project
+                });
+                
+                // Display results
+                processedResult.textContent = JSON.stringify(processedQuery, null, 2);
+                processedResult.style.display = 'block';
+                
+                wiqlResult.textContent = wiql;
+                wiqlResult.style.display = 'block';
+                
+                urlResult.textContent = url;
+                urlContainer.style.display = 'block';
+                
+                testLink.href = url;
+            });
+            
+            // Natural language processing
+            function processNaturalLanguage(query, context) {
+                const lowerQuery = query.toLowerCase();
+                const processedQuery = {
+                    filters: {},
+                    workItemTypes: [],
+                    timeRange: {}
+                };
+                
+                // Process work item types
+                if (lowerQuery.includes('bug') || lowerQuery.includes('defect')) {
+                    processedQuery.workItemTypes.push('Bug');
+                }
+                
+                if (lowerQuery.includes('user stor')) {
+                    processedQuery.workItemTypes.push('User Story');
+                }
+                
+                if (lowerQuery.includes('task')) {
+                    processedQuery.workItemTypes.push('Task');
+                }
+                
+                if (lowerQuery.includes('feature')) {
+                    processedQuery.workItemTypes.push('Feature');
+                }
+                
+                // Process assignments
+                if (lowerQuery.includes('assigned to me') || lowerQuery.includes('my work') || lowerQuery.includes('my bug')) {
+                    processedQuery.filters.assignedTo = '@Me';
+                }
+                
+                // Process time ranges
+                if (lowerQuery.includes('today') || lowerQuery.includes('past day')) {
+                    processedQuery.timeRange.type = 'today';
+                } else if (lowerQuery.includes('yesterday')) {
+                    processedQuery.timeRange.type = 'yesterday';
+                } else if (lowerQuery.includes('this week')) {
+                    processedQuery.timeRange.type = 'thisWeek';
+                } else if (lowerQuery.includes('last week')) {
+                    processedQuery.timeRange.type = 'lastWeek';
+                }
+                
+                // Process state/status
+                const stateTerms = {
+                    'open': ['New', 'Active', 'To Do'],
+                    'active': ['Active', 'In Progress', 'Doing'],
+                    'closed': ['Closed', 'Done', 'Resolved', 'Completed'],
+                    'resolved': ['Resolved', 'Done', 'Completed']
+                };
+                
+                processedQuery.filters.state = [];
+                
+                for (const [term, states] of Object.entries(stateTerms)) {
+                    if (lowerQuery.includes(term)) {
+                    processedQuery.filters.state.push(...states);
+                    }
+                }
+                
+                // Process priority
+                if (lowerQuery.includes('high priority') || lowerQuery.includes('priority 1')) {
+                    processedQuery.filters.priority = [1, 2];
+                } else if (lowerQuery.includes('medium priority') || lowerQuery.includes('priority 3')) {
+                    processedQuery.filters.priority = [3];
+                } else if (lowerQuery.includes('low priority') || lowerQuery.includes('priority 4')) {
+                    processedQuery.filters.priority = [4];
+                }
+                
+                return processedQuery;
+            }
+            
+            // Generate WIQL
+            function generateWIQL(processedQuery) {
+                // Build SELECT clause with fields
+                const fields = [
+                    '[System.Id]',
+                    '[System.Title]',
+                    '[System.WorkItemType]',
+                    '[System.State]',
+                    '[System.AssignedTo]',
+                    '[System.CreatedDate]',
+                    '[System.ChangedDate]'
+                ];
+                
+                if (processedQuery.filters.priority && processedQuery.filters.priority.length > 0) {
+                    fields.push('[Microsoft.VSTS.Common.Priority]');
+                }
+                
+                // Build SELECT clause
+                const selectClause = `SELECT ${fields.join(', ')}`;
+                
+                // Build FROM clause
+                const fromClause = 'FROM WorkItems';
+                
+                // Build WHERE clause
+                const conditions = [];
+                
+                // Work item types
+                if (processedQuery.workItemTypes && processedQuery.workItemTypes.length > 0) {
+                    const typeConditions = processedQuery.workItemTypes.map(type => 
+                    `[System.WorkItemType] = '${type}'`
+                    );
+                    conditions.push(`(${typeConditions.join(' OR ')})`);
+                }
+                
+                // Assignment
+                if (processedQuery.filters.assignedTo) {
+                    conditions.push(`[System.AssignedTo] = ${processedQuery.filters.assignedTo}`);
+                }
+                
+                // State
+                if (processedQuery.filters.state && processedQuery.filters.state.length > 0) {
+                    const stateConditions = processedQuery.filters.state.map(state => 
+                    `[System.State] = '${state}'`
+                    );
+                    conditions.push(`(${stateConditions.join(' OR ')})`);
+                }
+                
+                // Priority
+                if (processedQuery.filters.priority && processedQuery.filters.priority.length > 0) {
+                    const priorityConditions = processedQuery.filters.priority.map(priority => 
+                    `[Microsoft.VSTS.Common.Priority] = ${priority}`
+                    );
+                    conditions.push(`(${priorityConditions.join(' OR ')})`);
+                }
+                
+                // Time range
+                if (processedQuery.timeRange && processedQuery.timeRange.type) {
+                    switch (processedQuery.timeRange.type) {
+                    case 'today':
+                        conditions.push("[System.ChangedDate] >= @Today");
+                        break;
+                    case 'yesterday':
+                        conditions.push("[System.ChangedDate] >= @Today-1 AND [System.ChangedDate] < @Today");
+                        break;
+                    case 'thisWeek':
+                        conditions.push("[System.ChangedDate] >= @StartOfWeek AND [System.ChangedDate] <= @EndOfWeek");
+                        break;
+                    case 'lastWeek':
+                        conditions.push("[System.ChangedDate] >= @StartOfWeek-7 AND [System.ChangedDate] <= @EndOfWeek-7");
+                        break;
+                    }
+                }
+                
+                // Build WHERE clause
+                let whereClause = '';
+                if (conditions.length > 0) {
+                    whereClause = `WHERE ${conditions.join(' AND ')}`;
+                }
+                
+                // Build ORDER BY clause
+                let orderByClause = 'ORDER BY [System.ChangedDate] DESC';
+                
+                // Construct full WIQL
+                let wiql = `${selectClause} ${fromClause}`;
+                
+                if (whereClause) {
+                    wiql += ` ${whereClause}`;
+                }
+                
+                wiql += ` ${orderByClause}`;
+                
+                return wiql;
+            }
+            
+            // Generate URL
+            function generateQueryUrl(processedQuery, context) {
+                // Determine base URL
+                const baseUrl = `https://dev.azure.com/${context.organization}/${context.project}/_queries/query/`;
+                
+                // Build the WIQL query
+                const wiql = generateWIQL(processedQuery);
+                
+                // Encode the WIQL for URL
+                const encodedWiql = encodeURIComponent(wiql);
+                
+                // Build the final URL
+                return `${baseUrl}?wiql=${encodedWiql}`;
+            }
+        });
+    </script>
+</body>
+</html>

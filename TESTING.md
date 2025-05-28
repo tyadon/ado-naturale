@@ -18,23 +18,24 @@ Ensure you have access to:
 - Query creation permissions
 
 ### 3. Test Environment URLs
-- Visual Studio Team Services: `https://{org}.visualstudio.com/{project}/_queries`
-- Azure DevOps: `https://dev.azure.com/{org}/{project}/_queries`
+- Visual Studio Team Services: `https://{org}.visualstudio.com/{project}/`
+- Azure DevOps: `https://dev.azure.com/{org}/{project}/`
 
 ## Core Functionality Tests
 
 ### Test 1: Extension Loading
-**Objective**: Verify the extension loads correctly on ADO query pages
+**Objective**: Verify the extension loads correctly on ADO pages
 
 **Steps**:
-1. Navigate to an ADO query page
+1. Navigate to any ADO page
 2. Wait for page to fully load
-3. Look for the "Natural Language Query" interface
+3. Look for the "Natural Language Query" interface at the bottom of the page
 
 **Expected Results**:
-- Interface appears at the top of the page
+- Interface appears at the bottom of the page
 - No console errors
 - Interface is properly styled and responsive
+- UI can be minimized and maximized
 
 **Debug Commands**:
 ```javascript
@@ -49,17 +50,17 @@ window.ADONaturale_Debug.getContext()
 **Objective**: Test simple natural language queries
 
 **Test Cases**:
-| Input | Expected WIQL Pattern |
+| Input | Expected URL Pattern |
 |-------|----------------------|
-| "Show me my bugs" | `WHERE [System.WorkItemType] = 'Bug' AND [System.AssignedTo] = @Me` |
-| "Items assigned to me" | `WHERE [System.AssignedTo] = @Me` |
-| "Work items I created" | `WHERE [System.CreatedBy] = @Me` |
-| "All user stories" | `WHERE [System.WorkItemType] = 'User Story'` |
+| "Show me my bugs" | URL containing `wiql=SELECT%20*%20FROM%20WorkItems%20WHERE%20[System.WorkItemType]%20=%20'Bug'%20AND%20[System.AssignedTo]%20=%20@Me` |
+| "Items assigned to me" | URL containing `wiql=SELECT%20*%20FROM%20WorkItems%20WHERE%20[System.AssignedTo]%20=%20@Me` |
+| "Work items I created" | URL containing `wiql=SELECT%20*%20FROM%20WorkItems%20WHERE%20[System.CreatedBy]%20=%20@Me` |
+| "All user stories" | URL containing `wiql=SELECT%20*%20FROM%20WorkItems%20WHERE%20[System.WorkItemType]%20=%20'User%20Story'` |
 
 **Steps**:
 1. Enter each test query in the natural language input
 2. Click "Query" button
-3. Verify WIQL is generated and executed
+3. Verify URL is generated and navigation occurs
 4. Check results appear in ADO interface
 
 ### Test 3: Query Execution
@@ -68,13 +69,14 @@ window.ADONaturale_Debug.getContext()
 **Steps**:
 1. Enter "Show me my bugs"
 2. Click "Query" button
-3. Wait for execution to complete
+3. Wait for navigation to complete
 4. Verify results display in ADO results grid
 
 **Expected Results**:
-- Query executes without errors
+- Navigation to query URL occurs
 - Results appear in standard ADO interface
 - Loading indicators work properly
+- URL contains properly encoded WIQL
 
 ### Test 4: Error Handling
 **Objective**: Test error scenarios and recovery
@@ -101,25 +103,27 @@ window.ADONaturale_Debug.getContext()
    - "Assigned to me"
    - "High priority stories"
    - "Created by me"
-2. Verify queries execute correctly
+2. Verify navigation to query URLs occurs correctly
 
 ### Test 6: Interface Interactions
 **Objective**: Test UI responsiveness and interactions
 
 **Steps**:
-1. Test toggle button (minimize/maximize)
+1. Test minimize/maximize button
 2. Test keyboard shortcuts (Ctrl+Enter, Shift+Enter)
 3. Test textarea auto-resize
 4. Test responsive design on different screen sizes
+5. Verify UI persists across page navigation in ADO
 
-### Test 7: Query History
-**Objective**: Verify query history functionality
+### Test 7: UI Positioning
+**Objective**: Verify proper positioning and behavior of UI
 
 **Steps**:
-1. Execute several different queries
-2. Open extension popup
-3. Check usage statistics update
-4. Verify queries are saved to history
+1. Test UI on different ADO pages
+2. Verify UI stays at the bottom of the screen
+3. Test UI with different browser window sizes
+4. Verify UI does not interfere with ADO functionality
+5. Test scrolling behavior with UI visible
 
 ## Browser Compatibility Tests
 
@@ -169,12 +173,22 @@ window.ADONaturale_Debug.getContext()
 **Objective**: Ensure no conflicts with existing ADO functionality
 
 **Steps**:
-1. Test existing ADO query features still work
+1. Test existing ADO features with extension active
 2. Verify no visual conflicts or layout issues
 3. Test with ADO dark theme (if available)
 4. Check accessibility features remain functional
+5. Verify extension works on all ADO pages, not just query pages
 
-### Test 13: Multiple Projects
+### Test 13: Service Worker Functionality
+**Objective**: Test the background service worker functionality
+
+**Steps**:
+1. Verify URL generation works correctly
+2. Test extension functionality after browser restart
+3. Check for console errors related to the service worker
+4. Verify service worker initialization occurs properly
+
+### Test 14: Multiple Projects
 **Objective**: Test across different project configurations
 
 **Test Scenarios**:
@@ -306,4 +320,7 @@ Before releasing:
 - [ ] Security tests pass
 - [ ] Cross-browser compatibility verified
 - [ ] Documentation updated
-- [ ] Icons and assets finalized 
+- [ ] UI positioning and behavior verified
+- [ ] Service worker functioning correctly
+- [ ] URL generation and navigation working properly
+- [ ] Minimize/maximize functionality working

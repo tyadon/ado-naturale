@@ -60,14 +60,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 async function handleNaturalLanguageProcessing(data, sendResponse) {
   try {
     const { query, context } = data;
-    
-    // TODO: Implement Azure OpenAI integration
+      // TODO: Implement Azure OpenAI integration
     // For now, use a simple pattern matching approach
-    const wiqlQuery = await generateWIQLFromNaturalLanguage(query, context);
+    const processedQuery = await processNaturalLanguage(query, context);
+    const queryUrl = await generateQueryUrl(processedQuery, context);
     
     sendResponse({
       success: true,
-      wiql: wiqlQuery,
+      queryUrl: queryUrl,
       originalQuery: query
     });
   } catch (error) {
@@ -220,4 +220,236 @@ async function toggleExtensionState(enabled, sendResponse) {
  */
 function generateId() {
   return Date.now().toString(36) + Math.random().toString(36).substr(2);
-} 
+}
+
+/**
+ * Process natural language query
+ */
+async function processNaturalLanguage(query, context) {
+  const lowerQuery = query.toLowerCase();
+  const processedQuery = {
+    filters: {},
+    workItemTypes: [],
+    timeRange: {}
+  };
+  
+  // Process work item types
+  if (lowerQuery.includes('bug') || lowerQuery.includes('defect')) {
+    processedQuery.workItemTypes.push('Bug');
+  }
+  
+  if (lowerQuery.includes('user stor')) {
+    processedQuery.workItemTypes.push('User Story');
+  }
+  
+  if (lowerQuery.includes('task')) {
+    processedQuery.workItemTypes.push('Task');
+  }
+  
+  if (lowerQuery.includes('feature')) {
+    processedQuery.workItemTypes.push('Feature');
+  }
+  
+  // Process assignments
+  if (lowerQuery.includes('assigned to me') || lowerQuery.includes('my work') || lowerQuery.includes('my bug')) {
+    processedQuery.filters.assignedTo = '@Me';
+  }
+  
+  // Process time ranges
+  if (lowerQuery.includes('today') || lowerQuery.includes('past day')) {
+    processedQuery.timeRange.type = 'today';
+  } else if (lowerQuery.includes('yesterday')) {
+    processedQuery.timeRange.type = 'yesterday';
+  } else if (lowerQuery.includes('this week')) {
+    processedQuery.timeRange.type = 'thisWeek';
+  } else if (lowerQuery.includes('last week')) {
+    processedQuery.timeRange.type = 'lastWeek';
+  } else if (lowerQuery.includes('this month')) {
+    processedQuery.timeRange.type = 'thisMonth';
+  } else if (lowerQuery.includes('last month')) {
+    processedQuery.timeRange.type = 'lastMonth';
+  } else if (lowerQuery.includes('this sprint') || lowerQuery.includes('current sprint')) {
+    processedQuery.timeRange.type = 'thisSprint';
+  } else if (lowerQuery.includes('last sprint') || lowerQuery.includes('previous sprint')) {
+    processedQuery.timeRange.type = 'lastSprint';
+  }
+  
+  // Process state/status
+  const stateTerms = {
+    'open': ['New', 'Active', 'To Do'],
+    'active': ['Active', 'In Progress', 'Doing'],
+    'closed': ['Closed', 'Done', 'Resolved', 'Completed'],
+    'resolved': ['Resolved', 'Done', 'Completed']
+  };
+  
+  processedQuery.filters.state = [];
+  
+  for (const [term, states] of Object.entries(stateTerms)) {
+    if (lowerQuery.includes(term)) {
+      processedQuery.filters.state.push(...states);
+    }
+  }
+  
+  // Process priority
+  if (lowerQuery.includes('high priority') || lowerQuery.includes('priority 1')) {
+    processedQuery.filters.priority = [1, 2];
+  } else if (lowerQuery.includes('medium priority') || lowerQuery.includes('priority 3')) {
+    processedQuery.filters.priority = [3];
+  } else if (lowerQuery.includes('low priority') || lowerQuery.includes('priority 4')) {
+    processedQuery.filters.priority = [4];
+  }
+  
+  // Process sorting
+  if (lowerQuery.includes('newest') || lowerQuery.includes('recent')) {
+    processedQuery.sortBy = { field: 'created', direction: 'desc' };
+  } else if (lowerQuery.includes('oldest')) {
+    processedQuery.sortBy = { field: 'created', direction: 'asc' };
+  }
+  
+  return processedQuery;
+}
+
+/**
+ * Generate Azure DevOps query URL from processed query
+ */
+async function generateQueryUrl(processedQuery, context) {
+  // Determine base URL
+  let baseUrl;
+  if (context.url.includes('visualstudio.com')) {
+    baseUrl = `https://${context.organization}.visualstudio.com/${context.project}/_queries/query/`;
+  } else {
+    baseUrl = `https://dev.azure.com/${context.organization}/${context.project}/_queries/query/`;
+  }
+  
+  // Build the WIQL query
+  const wiql = generateWIQL(processedQuery);
+  
+  // Encode the WIQL for URL
+  const encodedWiql = encodeURIComponent(wiql);
+  
+  // Build the final URL
+  return `${baseUrl}?wiql=${encodedWiql}`;
+}
+
+/**
+ * Generate WIQL from processed query 
+ */
+function generateWIQL(processedQuery) {
+  // Build SELECT clause with fields
+  const fields = [
+    '[System.Id]',
+    '[System.Title]',
+    '[System.WorkItemType]',
+    '[System.State]',
+    '[System.AssignedTo]',
+    '[System.CreatedDate]',
+    '[System.ChangedDate]'
+  ];
+  
+  if (processedQuery.filters.priority && processedQuery.filters.priority.length > 0) {
+    fields.push('[Microsoft.VSTS.Common.Priority]');
+  }
+  
+  // Build SELECT clause
+  const selectClause = `SELECT ${fields.join(', ')}`;
+  
+  // Build FROM clause
+  const fromClause = 'FROM WorkItems';
+  
+  // Build WHERE clause
+  const conditions = [];
+  
+  // Work item types
+  if (processedQuery.workItemTypes && processedQuery.workItemTypes.length > 0) {
+    const typeConditions = processedQuery.workItemTypes.map(type => 
+      `[System.WorkItemType] = '${type}'`
+    );
+    conditions.push(`(${typeConditions.join(' OR ')})`);
+  }
+  
+  // Assignment
+  if (processedQuery.filters.assignedTo) {
+    conditions.push(`[System.AssignedTo] = ${processedQuery.filters.assignedTo}`);
+  }
+  
+  // State
+  if (processedQuery.filters.state && processedQuery.filters.state.length > 0) {
+    const stateConditions = processedQuery.filters.state.map(state => 
+      `[System.State] = '${state}'`
+    );
+    conditions.push(`(${stateConditions.join(' OR ')})`);
+  }
+  
+  // Priority
+  if (processedQuery.filters.priority && processedQuery.filters.priority.length > 0) {
+    const priorityConditions = processedQuery.filters.priority.map(priority => 
+      `[Microsoft.VSTS.Common.Priority] = ${priority}`
+    );
+    conditions.push(`(${priorityConditions.join(' OR ')})`);
+  }
+  
+  // Time range
+  if (processedQuery.timeRange && processedQuery.timeRange.type) {
+    switch (processedQuery.timeRange.type) {
+      case 'today':
+        conditions.push("[System.ChangedDate] >= @Today");
+        break;
+      case 'yesterday':
+        conditions.push("[System.ChangedDate] >= @Today-1 AND [System.ChangedDate] < @Today");
+        break;
+      case 'thisWeek':
+        conditions.push("[System.ChangedDate] >= @StartOfWeek AND [System.ChangedDate] <= @EndOfWeek");
+        break;
+      case 'lastWeek':
+        conditions.push("[System.ChangedDate] >= @StartOfWeek-7 AND [System.ChangedDate] <= @EndOfWeek-7");
+        break;
+      case 'thisMonth':
+        conditions.push("[System.ChangedDate] >= @StartOfMonth AND [System.ChangedDate] <= @EndOfMonth");
+        break;
+      case 'lastMonth':
+        conditions.push("[System.ChangedDate] >= @StartOfMonth-1 AND [System.ChangedDate] <= @EndOfMonth-1");
+        break;
+      case 'thisSprint':
+        conditions.push("[System.IterationPath] = @CurrentIteration");
+        break;
+      case 'lastSprint':
+        conditions.push("[System.IterationPath] = @CurrentIteration-1");
+        break;
+    }
+  }
+  
+  // Build WHERE clause
+  let whereClause = '';
+  if (conditions.length > 0) {
+    whereClause = `WHERE ${conditions.join(' AND ')}`;
+  }
+  
+  // Build ORDER BY clause
+  let orderByClause = 'ORDER BY [System.ChangedDate] DESC';
+  if (processedQuery.sortBy) {
+    const sortMappings = {
+      id: '[System.Id]',
+      created: '[System.CreatedDate]',
+      updated: '[System.ChangedDate]',
+      priority: '[Microsoft.VSTS.Common.Priority]',
+      title: '[System.Title]',
+      state: '[System.State]'
+    };
+    
+    const field = sortMappings[processedQuery.sortBy.field] || '[System.ChangedDate]';
+    const direction = processedQuery.sortBy.direction === 'asc' ? 'ASC' : 'DESC';
+    
+    orderByClause = `ORDER BY ${field} ${direction}`;
+  }
+  
+  // Construct full WIQL
+  let wiql = `${selectClause} ${fromClause}`;
+  
+  if (whereClause) {
+    wiql += ` ${whereClause}`;
+  }
+  
+  wiql += ` ${orderByClause}`;
+  
+  return wiql;
+}

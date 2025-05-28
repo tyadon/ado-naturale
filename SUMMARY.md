@@ -9,13 +9,13 @@ We have successfully created a complete **Phase 1** Microsoft Edge extension tha
 ### 📁 **Project Structure**
 ```
 ado-naturale/
-├── manifest.json              ✅ Manifest V3 configuration
+├── manifest.json              ✅ Manifest V3 configuration (icons removed)
 ├── background/
-│   └── service-worker.js      ✅ Background service worker
+│   └── service-worker.js      ✅ Background service worker (URL functionality)
 ├── content/
 │   ├── content-script.js      ✅ Main content script
-│   ├── ui-injector.js         ✅ UI component injection
-│   └── query-executor.js      ✅ WIQL execution logic
+│   ├── ui-injector.js         ✅ UI component injection (bottom positioning)
+│   └── query-executor.js      ✅ URL-based execution logic
 ├── popup/
 │   ├── popup.html            ✅ Extension popup interface
 │   ├── popup.js              ✅ Popup functionality
@@ -23,10 +23,9 @@ ado-naturale/
 ├── shared/
 │   ├── api-client.js         ✅ ADO API interaction utilities
 │   ├── nl-processor.js       ✅ Natural language processing
-│   └── wiql-generator.js     ✅ WIQL query generation
+│   └── url-generator.js      ✅ URL query generation (replaces WIQL)
 ├── styles/
-│   └── content.css           ✅ Content script styling
-├── assets/icons/             ⚠️  Placeholder (needs actual icons)
+│   └── content.css           ✅ Content script styling (fixed positioning)
 ├── README.md                 ✅ Comprehensive documentation
 ├── TESTING.md                ✅ Testing guide
 ├── PROJECT_PLAN.md           ✅ Project planning document
@@ -37,8 +36,8 @@ ado-naturale/
 
 #### **1. Extension Architecture**
 - **Manifest V3** compliant extension
-- **Content Script** injection on ADO query pages
-- **Background Service Worker** for message handling
+- **Content Script** injection on all ADO pages
+- **Background Service Worker** for URL function handling
 - **Popup Interface** for extension management
 - **Modular Design** with separated concerns
 
@@ -49,24 +48,23 @@ ado-naturale/
 - **Confidence Scoring** for query understanding
 - **Fallback Mechanisms** for unsupported queries
 
-#### **3. WIQL Generation**
-- **Dynamic Query Building** based on processed natural language
-- **Field Selection** appropriate for query type
-- **WHERE Clause Construction** with proper filtering
-- **ORDER BY Optimization** for relevant sorting
-- **Query Validation** and error checking
+#### **3. URL Generation**
+- **Dynamic URL Building** based on processed natural language
+- **Parameter Encoding** for proper URL structure
+- **Query String Construction** with proper filtering
+- **URL Validation** and error checking
+- **Navigation Handling** for result display
 
 #### **4. ADO Integration**
-- **DOM Detection** for query editor elements
-- **Monaco Editor Support** for code editor integration
-- **Query Injection** into existing ADO interface
-- **Execution Triggering** via button clicks or keyboard shortcuts
-- **Result Display** in standard ADO interface
+- **URL-based Navigation** for query execution
+- **DOM Manipulation** for UI insertion at bottom of page
+- **Minimize/Maximize Feature** for better user experience
+- **CSS Fixed Positioning** for non-intrusive interface
 
 #### **5. User Interface**
-- **Seamless Integration** with ADO design system
+- **Bottom Positioning** for less intrusive experience
 - **Responsive Design** for different screen sizes
-- **Dark Theme Support** following system preferences
+- **Minimizable Interface** to save screen space
 - **Accessibility Features** with proper ARIA labels
 - **Loading States** and error handling
 
@@ -74,7 +72,7 @@ ado-naturale/
 
 #### **Core Features**
 - ✅ Natural language query input
-- ✅ WIQL generation and execution
+- ✅ URL generation and navigation
 - ✅ Query suggestions and templates
 - ✅ Query history tracking
 - ✅ Extension enable/disable toggle
@@ -89,7 +87,8 @@ ado-naturale/
 - ✅ Creator-based queries ("items I created")
 
 #### **UI/UX Features**
-- ✅ Collapsible interface
+- ✅ Bottom-positioned interface
+- ✅ Minimizable UI panel
 - ✅ Auto-resizing textarea
 - ✅ Keyboard shortcuts (Ctrl+Enter, Shift+Enter)
 - ✅ Quick suggestion buttons
@@ -98,11 +97,11 @@ ado-naturale/
 
 ### 📊 **Example Queries Supported**
 
-| Natural Language | Generated WIQL |
+| Natural Language | Generated URL Pattern |
 |------------------|----------------|
-| "Show me my bugs" | `SELECT [System.Id], [System.Title], [System.State] FROM WorkItems WHERE [System.WorkItemType] = 'Bug' AND [System.AssignedTo] = @Me` |
-| "High priority user stories" | `SELECT [System.Id], [System.Title], [Microsoft.VSTS.Common.Priority] FROM WorkItems WHERE [System.WorkItemType] = 'User Story' AND [Microsoft.VSTS.Common.Priority] <= 2` |
-| "Items created this week" | `SELECT [System.Id], [System.Title], [System.CreatedDate] FROM WorkItems WHERE [System.CreatedDate] >= @Today - 7` |
+| "Show me my bugs" | `https://dev.azure.com/{org}/{project}/_queries/query/?wiql=SELECT * FROM WorkItems WHERE [System.WorkItemType] = 'Bug' AND [System.AssignedTo] = @Me` |
+| "High priority user stories" | `https://dev.azure.com/{org}/{project}/_queries/query/?wiql=SELECT * FROM WorkItems WHERE [System.WorkItemType] = 'User Story' AND [Microsoft.VSTS.Common.Priority] <= 2` |
+| "Items created this week" | `https://dev.azure.com/{org}/{project}/_queries/query/?wiql=SELECT * FROM WorkItems WHERE [System.CreatedDate] >= @Today - 7` |
 
 ## 🧪 **Testing & Quality Assurance**
 
@@ -140,20 +139,22 @@ The extension is now **ready for Phase 1 testing**! Here's how to get started:
 ## 🔮 **Next Steps (Phase 2)**
 
 ### **Immediate Priorities**
-1. **Create Extension Icons** 
-   - Design proper 16x16, 32x32, 48x48, 128x128 icons
-   - Use brain theme with Azure DevOps colors
-
-2. **Azure OpenAI Integration**
+1. **Azure OpenAI Integration**
    - Replace pattern matching with actual AI processing
    - Implement more sophisticated natural language understanding
    - Add support for complex, multi-condition queries
 
-3. **Enhanced Query Support**
+2. **Enhanced Query Support**
    - Cross-project queries
    - Custom field support
    - Hierarchical work item relationships
    - Advanced date/time parsing
+
+3. **UI Refinements**
+   - Further improve UI positioning and behavior
+   - Add customization options for UI placement
+   - Enhance visibility of the extension
+   - Make UI more responsive to different ADO themes
 
 ### **Future Enhancements**
 1. **User Experience**
@@ -178,7 +179,7 @@ The extension is now **ready for Phase 1 testing**! Here's how to get started:
 
 ### **Technical Goals**
 - ✅ **Manifest V3 Compliance**: Modern extension architecture
-- ✅ **Seamless Integration**: No conflicts with existing ADO functionality
+- ✅ **Seamless Integration**: Non-intrusive interface that doesn't interfere with ADO functionality
 - ✅ **Performance**: Query processing under 2 seconds
 - ✅ **Reliability**: Comprehensive error handling
 
@@ -186,11 +187,11 @@ The extension is now **ready for Phase 1 testing**! Here's how to get started:
 - ✅ **Intuitive Interface**: Natural language input with visual feedback
 - ✅ **Accessibility**: Keyboard navigation and screen reader support
 - ✅ **Responsive Design**: Works on different screen sizes
-- ✅ **Visual Integration**: Matches ADO design system
+- ✅ **Minimal Interference**: Bottom positioning with minimize capability
 
 ### **Functional Goals**
 - ✅ **Query Coverage**: Supports 90%+ of common query patterns
-- ✅ **WIQL Accuracy**: Generates valid, executable queries
+- ✅ **URL-based Navigation**: Effectively uses ADO's URL structure for queries
 - ✅ **Error Recovery**: Graceful handling of edge cases
 - ✅ **Data Privacy**: No sensitive data sent to external services
 
@@ -202,11 +203,12 @@ We have successfully built a **production-ready Phase 1** Microsoft Edge extensi
 - **Solid Foundation**: Well-architected codebase ready for future enhancements
 - **Professional Quality**: Comprehensive documentation, testing, and error handling
 - **Scalable Design**: Modular architecture that supports easy feature additions
+- **Non-Intrusive Interface**: Bottom positioning with minimize capability for better user experience
 
 The extension is now ready for:
 1. **Internal Testing** by the development team
 2. **Beta Testing** with select Azure DevOps users
 3. **Feedback Collection** for Phase 2 planning
-4. **Icon Design** and final polish for release
+4. **Further UI Refinements** based on user feedback
 
-**This represents a significant step forward in making Azure DevOps more accessible to users of all technical levels!** 🚀 
+**This represents a significant step forward in making Azure DevOps more accessible to users of all technical levels!** 🚀
